@@ -257,7 +257,7 @@ impl<'base> Number<'base> {
         }
     }
     fn pad_digits_high(&mut self, digits: usize) {
-        for _ in 0..self.digits {
+        for _ in 0..digits {
             self.push_high(0);
         }
         // TODO optimize
