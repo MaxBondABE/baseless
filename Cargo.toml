@@ -3,6 +3,10 @@ name = "baseless"
 version = "0.0.0"
 authors = ["Max Bond <max.o.bond@gmail.com>"]
 edition = "2018"
+license = "MIT"
+license-file = "LICENSE"
+description = "Arbitrary precision, arbitrary base floating-point integers"
+repository = "https://github.com/MaxBondABE/baseless"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
