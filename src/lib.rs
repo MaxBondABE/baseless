@@ -4,6 +4,8 @@ pub mod util;
 pub mod iter;
 
 use std::collections::VecDeque;
+use std::convert::TryFrom;
+use std::ops::{Shl, Shr};
 use util::*;
 use iter::BorrowedNumberIter;
 
@@ -111,6 +113,18 @@ impl<'base> Number<'base> {
 
     pub fn digits(&self) -> usize {
         self.digits
+    }
+    pub fn power(&self) -> isize {
+        self.power
+    }
+    pub fn sign(&self) -> Sign {
+        self.sign
+    }
+    pub fn positive(&self) -> bool {
+        self.sign == Sign::Positive
+    }
+    pub fn negative(&self) -> bool {
+        self.sign == Sign::Negative
     }
 
     /// Vector API
@@ -242,35 +256,88 @@ impl<'base> Number<'base> {
             self.buckets.push_back(0);
         }
     }
+    fn pad_digits_high(&mut self, digits: usize) {
+        for _ in 0..self.digits {
+            self.push_high(0);
+        }
+        // TODO optimize
+    }
+    fn pad_digits_low(&mut self, digits: usize) {
+        for _ in 0..digits {
+            self.push_low(0);
+            // TODO optimize
+        }
+        self.power -= isize::try_from(digits).expect("Overflowed isize while adding low-order digits.");
+    }
 
     /// Arithmetic
 
-    /// Returns the index of the digit representing a certain power, if it exists
-//     fn power_idx(&self, power: isize) -> Result<usize, PowerIndexError> {
-//         if self.digits == 0 || power > self.power + isize::try_from(self.digits - 1).expect("Couldn't convert digit count to isize") {
-//           // We can subtract 1 from self.digits because we've already determined it is not 0
-//             return Err(PowerIndexError::InsufficientDigitsHigh)
-//         } else if power < self.power {
-//             return Err(PowerIndexError::InsufficientDigitsLow)
-//         }
-//         if self.power > power {
-//         }
-//     }
+    /// Returns the index of the digit representing a certain power, if it exists.
+    /// Otherwise returns an error containing the number of digits required, to which side, and
+    /// what the index will be after they are added.
+    fn power_idx(&self, power: isize) -> Result<usize, PowerIndexError> {
+        if self.digits == 0 {
+            if power == 0 {
+                return Err(PowerIndexError::InsufficientDigitsHigh(1));
+            } else if power > 0 {
+                return Err(PowerIndexError::InsufficientDigitsHigh(power as usize));
+            } else {
+                return Err(PowerIndexError::InsufficientDigitsLow(-power as usize));
+            }
+        }
 
-//     pub fn add_digit(&mut self, digit: Digit, power: isize) {
-//         // TODO add asserts
-//         if power >= 0 {
-//                 let (bucket_idx, digit_idx) = self.base.digit_indexes(power as usize);
-//                 if bucket_idx > self.buckets.len() {
-//                     self.add_buckets_high(bucket_idx - self.buckets.len());
-//                 }
-//                 self.set_digit(bucket_idx, digit_idx, digit);
-//                 return; 
-//             }
-//         } else {
-//             if 
-//         }
-//     }
+        let highest_digit = self.power + isize::try_from(self.digits - 1).expect("Couldn't convert digit count to isize");
+        // We can safely subtract 1 from self.digits because we've already determined it is not 0
+        // Below our arithmetic is always nonnegative, and so the casting to usize is safe
+        if power > highest_digit {
+            return Err(PowerIndexError::InsufficientDigitsHigh((power - highest_digit) as usize));
+        } else if power < self.power {
+            return Err(PowerIndexError::InsufficientDigitsLow((self.power - power) as usize));
+        }
+
+        Ok((power - self.power) as usize)
+    }
+
+    // TODO better name
+    fn arithmetic_setup(&mut self, power: isize) -> usize {
+        match self.power_idx(power) {
+            Ok(idx) => idx,
+            Err(PowerIndexError::InsufficientDigitsLow(digits_needed)) => {
+                self.pad_digits_low(digits_needed);
+                0 // If we need low order, then our index will always be 0
+                  // (eg the first digit)
+            },
+            Err(PowerIndexError::InsufficientDigitsHigh(digits_needed)) => {
+                let idx = (self.digits - 1) + digits_needed;
+                // If we need high order digits, then our index will always be
+                // the number of added digits past the highest digit
+                // -1 for zero indexing
+                self.pad_digits_high(digits_needed);
+                idx
+            }
+        }
+    }
+
+    pub fn add_digit(&mut self, digit: Digit, power: isize) {
+        // TODO add asserts
+        let mut idx = self.arithmetic_setup(power);
+        let (bucket_idx, digit_idx) = self.base.indexes(idx);
+        let (new_digit, mut carry) = self.base.add_digits(digit, self.get_digit(bucket_idx, digit_idx));
+        self.set_digit(bucket_idx, digit_idx, new_digit);
+        idx += 1;
+
+        while idx < self.digits && carry != 0 {
+            let (bucket_idx, digit_idx) = self.base.indexes(idx);
+            // TODO when destucturing is supported in assignment, change this :(
+            let (new_digit, new_carry) = self.base.add_digits(carry, self.get_digit(bucket_idx, digit_idx));
+            carry = new_carry;
+            self.set_digit(bucket_idx, digit_idx, new_digit);
+            idx += 1;
+        }
+        if carry != 0 {
+            self.push_high(carry);
+        }
+    }
 //     pub fn sub_digit(&mut self, digit: Digit, power: usize) {
 // 
 //     }
@@ -287,15 +354,33 @@ impl<'base> Number<'base> {
     }
 }
 
-#[derive(Debug)]
+impl Shl<usize> for Number<'_> {
+    type Output = Self;
+
+    fn shl(mut self, rhs: usize) -> Self::Output {
+        self.power += isize::try_from(rhs).expect("Failed to convert into isize during left shift.");
+        self
+    }
+}
+
+impl Shr<usize> for Number<'_> {
+    type Output = Self;
+
+    fn shr(mut self, rhs: usize) -> Self::Output {
+        self.power -= isize::try_from(rhs).expect("Failed to convert into isize during right shift.");
+        self
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
 pub enum Sign {
     Positive,
     Negative
 }
 
 enum PowerIndexError {
-    InsufficientDigitsHigh,
-    InsufficientDigitsLow
+    InsufficientDigitsHigh(usize),
+    InsufficientDigitsLow(usize)
 }
 
 fn bitwise_parameters(base: u32) -> (usize, usize, usize) {
@@ -520,5 +605,90 @@ pub mod test {
         }
         n.set(9, 9);
         assert_eq!(n.iter().collect::<Vec<_>>(), vec!(9, 8, 7, 6, 5, 4, 3, 2, 1, 0));
+        // TODO iter weirdness
+    }
+
+    /// Arithmetic
+
+    #[test]
+    fn single_digit_addition() {
+        let b = Base::new(10);
+        let mut n = Number::new(&b);
+        n.push_high(1);
+        n.add_digit(1, 0);
+        assert_eq!(n.iter().collect::<Vec<_>>(), vec!(2));
+    }
+
+    #[test]
+    fn single_digit_addition_with_carry() {
+        let b = Base::new(10);
+        let mut n = Number::new(&b);
+        for _ in 0..3 {
+            n.push_high(9);
+        }
+        n.add_digit(1, 0);
+        assert_eq!(n.iter().collect::<Vec<_>>(), vec!(1,0,0,0));
+    }
+
+    #[test]
+    fn single_digit_addition_with_carry_across_bucket_boundary() {
+        let b = Base::new(10);
+        let mut n = Number::new(&b);
+        for _ in 0..b.digits_per_bucket() {
+            n.push_high(9);
+        }
+        n.add_digit(1, 0);
+        let mut expected = Vec::new();
+        expected.push(1);
+        for _ in 0..b.digits_per_bucket() {
+            expected.push(0);
+        }
+        assert_eq!(n.iter().collect::<Vec<_>>(), expected);
+    }
+
+    #[test]
+    fn single_digit_addition_with_carry_that_does_not_travel_all_the_way() {
+        let b = Base::new(10);
+        let mut n = Number::new(&b);
+        n.push_high(8);
+        n.push_high(9);
+        n.push_high(9);
+        n.push_high(1);
+        n.add_digit(2, 0);
+        assert_eq!(n.iter().collect::<Vec<_>>(), vec!(2, 0, 0, 0));
+    }
+
+    #[test]
+    fn single_digit_addition_with_new_digit_high() {
+        let b = Base::new(10);
+        let mut n = Number::new(&b);
+        n.push_high(1);
+        n.add_digit(2, 1);
+        assert_eq!(n.iter().collect::<Vec<_>>(), vec!(2, 1));
+    }
+
+    #[test]
+    fn single_digit_addition_with_new_digit_low() {
+        let b = Base::new(10);
+        let mut n = Number::new(&b);
+        n.push_high(1);
+        n.add_digit(2, -1);
+        assert_eq!(n.iter().collect::<Vec<_>>(), vec!(1, 2));
+    }
+
+    #[test]
+    fn shift_left_increases_power() {
+        let b = Base::new(10);
+        let mut n = Number::new(&b);
+        n = n << 1;
+        assert_eq!(n.power(), 1);
+    }
+
+    #[test]
+    fn shift_right_decreases_power() {
+        let b = Base::new(10);
+        let mut n = Number::new(&b);
+        n = n >> 1;
+        assert_eq!(n.power(), -1);
     }
 }
