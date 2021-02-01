@@ -44,9 +44,45 @@ impl ArithmeticPrecomputation {
 
 // Iterator which calculates each digit required to represent a native integer
 // as 
-pub struct ConversionFromNativeInteger {
+pub struct ConversionFromUsize {
     integer: usize,
-    base: usize
+    base: usize,
+    power: u32,
+    done: bool
+}
+impl ConversionFromUsize {
+    pub fn new(integer: usize, base: usize) -> Self {
+        let mut power = 0;
+        while base.pow(power + 1) < integer {
+            power += 1;
+        }
+        Self {
+            integer,
+            base,
+            power,
+            done: false
+        }
+    }
+}
+impl Iterator for ConversionFromUsize {
+    type Item = u8;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.done {
+            return None;
+        }
+        let mut digit = 0;
+        while ((digit + 1) as usize) * self.base.pow(self.power) <= self.integer {
+            digit += 1;
+        }
+        self.integer -= (digit as usize) * self.base.pow(self.power);
+        if self.power > 0 {
+            self.power -= 1;
+        } else {
+            self.done = true;
+        }
+        Some(digit)
+    }
 }
 
 // Iterator which converts a number from any base to any other base
@@ -97,6 +133,14 @@ pub mod test {
                 // 2 2
                 ((1, 1), (1, 1)),
             )
+        );
+    }
+
+    #[test]
+    fn conversion_from_usive() {
+        assert_eq!(
+            ConversionFromUsize::new(123, 10).collect::<Vec<_>>(),
+            vec!(1, 2, 3)
         );
     }
 
