@@ -11,16 +11,12 @@ use iter::BorrowedNumberIter;
 
 pub type Digit = u8;
 pub type Pair = (Digit, Digit);
-pub type Bucket = usize;
 
 #[derive(Debug)]
 pub struct Base {
     base: u32,
     addition_table: Vec<Pair>,
     multiplication_table: Vec<Pair>,
-    digit_width: usize,
-    digits_per_bucket: usize,
-    digit_bitmask: usize,
 }
 impl Base {
     pub fn new(base: u32) -> Self {
@@ -30,14 +26,10 @@ impl Base {
             addition_table.push(add);
             multiplication_table.push(mul);
         }
-        let (digit_width, digits_per_bucket, digit_bitmask) = bitwise_parameters(base);
         Self {
             base,
             addition_table,
             multiplication_table,
-            digit_width,
-            digits_per_bucket,
-            digit_bitmask
         }
     }
 
@@ -51,38 +43,11 @@ impl Base {
     pub fn multiply_digits(&self, a: Digit, b: Digit) -> Pair {
         *self.multiplication_table.get(pair_index((a, b), self.base)).unwrap()
     }
-
-    pub fn digits_per_bucket(&self) -> usize {
-        self.digits_per_bucket
-    }
-    pub fn digit_width(&self) -> usize {
-        self.digit_width
-    }
-    pub fn digit_bitmask(&self) -> usize {
-        self.digit_bitmask
-    }
-
-    /// Returns the index of a bucket within a vector of buckets, given the index
-    /// of a digit
-    pub fn bucket_index(&self, idx: usize) -> usize {
-        idx / self.digits_per_bucket
-    }
-    /// Returns the index of a digit within it's respective bucket, given the index
-    /// of a digit
-    pub fn digit_index(&self, idx: usize) -> usize {
-        idx % self.digits_per_bucket
-    }
-    /// Given the index of a particular digit, returns the index of it's bucket
-    /// within the vector of buckets, and it's index within that bucket.
-    pub fn indexes(&self, idx: usize) -> (usize, usize) {
-        (self.bucket_index(idx), self.digit_index(idx))
-    }
 }
 
 #[derive(Debug)]
 pub struct Number<'base> {
-    buckets: VecDeque<Bucket>,
-    digits: usize,
+    digits: VecDeque<Digit>,
     power: isize,
     sign: Sign,
     base: &'base Base
@@ -90,21 +55,15 @@ pub struct Number<'base> {
 impl<'base> Number<'base> {
     pub fn new(base: &'base Base) -> Self {
         Self {
-            buckets: VecDeque::new(),
-            digits: 0,
+            digits: VecDeque::new(),
             power: 0,
             sign: Sign::Positive,
             base
         }
     }
     pub fn with_capacity(base: &'base Base, digits: usize) -> Self {
-        let mut buckets = digits / base.digits_per_bucket();
-        if digits % base.digits_per_bucket() != 0 {
-            buckets += 1;
-        }
         Self {
-            buckets: VecDeque::with_capacity(buckets),
-            digits: 0,
+            digits: VecDeque::with_capacity(digits),
             power: 0,
             sign: Sign::Positive,
             base
@@ -112,7 +71,7 @@ impl<'base> Number<'base> {
     }
 
     pub fn digits(&self) -> usize {
-        self.digits
+        self.digits.len()
     }
     pub fn power(&self) -> isize {
         self.power
@@ -130,132 +89,38 @@ impl<'base> Number<'base> {
     /// Vector API
 
     pub fn get(&self, idx: usize) -> Option<Digit> {
-        if idx > self.digits || self.digits == 0 {
-            return None;
-        }
-        let (bucket_idx, digit_idx) = self.base.indexes(idx);
-        Some(self.get_digit(bucket_idx, digit_idx))
+        self.digits.get(idx).map(|d| *d)
     }
     pub fn set(&mut self, idx: usize, digit: Digit) {
-        if idx > self.digits {
+        if idx > self.digits.len() {
             panic!("Attempted to set inaccessible digit.");
             // TODO make consistent with vec panic msg
         }
-        if idx == self.digits {
+        if idx == self.digits.len() {
             self.push_high(digit);
             return;
         }
-        let (bucket_idx, digit_idx) = self.base.indexes(idx);
-        self.set_digit(bucket_idx, digit_idx, digit);
+        self.digits[idx] = digit;
     }
     /// Adds a new digit to the highest-order position
     pub fn push_high(&mut self, digit: Digit) {
-        let (bucket_idx, digit_idx) = self.base.indexes(self.digits);
-        if digit_idx == 0 { // New bucket
-            self.buckets.push_back(digit as Bucket)
-        } else {
-            self.set_digit(bucket_idx, digit_idx, digit)
-        }
-        self.digits += 1;
+        self.digits.push_back(digit);
     }
     /// Removes the digit from the highest order position, and returns it (if it
     /// exists)
     pub fn pop_high(&mut self) -> Option<Digit> {
-        if self.digits == 0 {
-            return None;
-        }
-        let (bucket_idx, digit_idx) = self.base.indexes(self.digits - 1);
-        let digit = self.get_digit(bucket_idx, digit_idx);
-        self.digits -= 1;
-        if digit_idx == 0 {
-            self.buckets.pop_back();
-        }
-        Some(digit)
+        self.digits.pop_back()
     }
     /// Adds a new digit to the lowest-order position
     pub fn push_low(&mut self, digit: Digit) {
-        let (bucket_idx, digit_idx) = (0, 0);
-        // push_low always pushes to (0, 0) - no need to call indexes() 
-        if self.digits == 0 || self.base.digit_index(self.digits - 1) == self.base.digits_per_bucket - 1 { // New bucket
-            self.buckets.push_back(0)
-        }
-        self.shift_digits_high(1);
-        self.set_digit(bucket_idx, digit_idx, digit);
-        self.digits += 1;
+        self.digits.push_front(digit);
     }
     /// Removes the digit from the lowest order position, and returns it (if it
     /// exists)
     pub fn pop_low(&mut self) -> Option<Digit> {
-        if self.digits == 0 {
-            return None;
-        }
-        let (bucket_idx, digit_idx) = (0, 0);
-        let digit = self.get_digit(bucket_idx, digit_idx);
-        self.shift_digits_low(1);
-        self.digits -= 1;
-        Some(digit)
+        self.digits.pop_front()
     }
-//     fn pad_high(&mut self, zeroes: usize) {
-//     }
-//     fn pad_low(&mut self, zeroes: usize) {
-//     }
 
-    /// Bucket Management
-
-    fn set_digit(&mut self, bucket_idx: usize, digit_idx: usize, digit: Digit) {
-        let bucket = self.buckets.get_mut(bucket_idx).expect("Attempted to set digit in uninitialzed bucket");
-        let shift = self.base.digit_width() * digit_idx;
-        *bucket = (*bucket & !(self.base.digit_bitmask() << shift)) | ((digit as usize) << shift);
-    }
-    fn get_digit(&self, bucket_idx: usize, digit_idx: usize) -> Digit {
-        let bucket = self.buckets.get(bucket_idx).expect("Attempted to fetch digit from uninitialzed bucket.");
-        let shift = self.base.digit_width() * digit_idx;
-        ((bucket & (self.base.digit_bitmask() << shift)) >> shift) as Digit
-    }
-    /// Assumes caller has allocated space as necessary.
-    fn shift_digits_high(&mut self, shift: usize) {
-        // TODO use bit shifts rather than set_digit to do an entire bucket at once
-        if self.digits == 0 {
-            return;
-        }
-        for _ in 0..shift {
-            for idx in (0..self.digits).into_iter().rev() {
-                let (current_bucket_idx, current_digit_idx) = self.base.indexes(idx);
-                let digit = self.get_digit(current_bucket_idx, current_digit_idx);
-                let (new_bucket_idx, new_digit_idx) = self.base.indexes(idx + 1);
-                self.set_digit(new_bucket_idx, new_digit_idx, digit);
-
-            }
-        }
-    }
-    /// Assumes caller has allocated space as necessary.
-    /// First digit is is overwritten
-    fn shift_digits_low(&mut self, shift: usize) {
-        // TODO use bit shifts rather than set_digit to do an entire bucket at once
-        if self.digits == 0 {
-            return;
-        }
-        for _ in 0..shift {
-            for idx in 1..self.digits {
-                let (current_bucket_idx, current_digit_idx) = self.base.indexes(idx);
-                let digit = self.get_digit(current_bucket_idx, current_digit_idx);
-                let (new_bucket_idx, new_digit_idx) = self.base.indexes(idx - 1);
-                self.set_digit(new_bucket_idx, new_digit_idx, digit);
-            }
-        }
-    }
-    fn add_buckets_high(&mut self, buckets: usize) {
-        self.buckets.reserve(buckets);
-        for _bucket in 0..buckets {
-            self.buckets.push_front(0);
-        }
-    }
-    fn add_buckets_low(&mut self, buckets: usize) {
-        self.buckets.reserve(buckets);
-        for _bucket in 0..buckets {
-            self.buckets.push_back(0);
-        }
-    }
     fn pad_digits_high(&mut self, digits: usize) {
         for _ in 0..digits {
             self.push_high(0);
@@ -276,7 +141,7 @@ impl<'base> Number<'base> {
     /// Otherwise returns an error containing the number of digits required, to which side, and
     /// what the index will be after they are added.
     fn power_idx(&self, power: isize) -> Result<usize, PowerIndexError> {
-        if self.digits == 0 {
+        if self.digits.len() == 0 {
             if power == 0 {
                 return Err(PowerIndexError::InsufficientDigitsHigh(1));
             } else if power > 0 {
@@ -286,7 +151,7 @@ impl<'base> Number<'base> {
             }
         }
 
-        let highest_digit = self.power + isize::try_from(self.digits - 1).expect("Couldn't convert digit count to isize");
+        let highest_digit = self.power + isize::try_from(self.digits.len() - 1).expect("Couldn't convert digit count to isize");
         // We can safely subtract 1 from self.digits because we've already determined it is not 0
         // Below our arithmetic is always nonnegative, and so the casting to usize is safe
         if power > highest_digit {
@@ -299,43 +164,52 @@ impl<'base> Number<'base> {
     }
 
     // TODO better name
-    fn arithmetic_setup(&mut self, power: isize) -> usize {
+    pub fn arithmetic_setup(&mut self, power: isize) -> Result<usize, usize> {
         match self.power_idx(power) {
-            Ok(idx) => idx,
-            Err(PowerIndexError::InsufficientDigitsLow(digits_needed)) => {
-                self.pad_digits_low(digits_needed);
-                0 // If we need low order, then our index will always be 0
-                  // (eg the first digit)
+            Ok(idx) => Ok(idx), // We have a digit in this power - return it
+            Err(PowerIndexError::InsufficientDigitsLow(needed)) => {
+                self.pad_digits_low(needed);
+                Err(0)
+                // We didn't have a digit in this power & needed more low-order
+                // digits - the 0th digit is now at this power
             },
-            Err(PowerIndexError::InsufficientDigitsHigh(digits_needed)) => {
-                let idx = (self.digits - 1) + digits_needed;
-                // If we need high order digits, then our index will always be
-                // the number of added digits past the highest digit
-                // -1 for zero indexing
-                self.pad_digits_high(digits_needed);
-                idx
+            Err(PowerIndexError::InsufficientDigitsHigh(needed)) => {
+                let idx = (self.digits.len() - 1) + needed;
+                self.pad_digits_high(needed);
+                Err(idx)
+                // We didn't have a digit in this power & needed more high-order
+                // digits - the index is the number of digits we added past the
+                // previous last digit
             }
         }
     }
 
     pub fn add_digit(&mut self, digit: Digit, power: isize) {
         // TODO add asserts
-        let mut idx = self.arithmetic_setup(power);
-        let (bucket_idx, digit_idx) = self.base.indexes(idx);
-        let (new_digit, mut carry) = self.base.add_digits(digit, self.get_digit(bucket_idx, digit_idx));
-        self.set_digit(bucket_idx, digit_idx, new_digit);
-        idx += 1;
-
-        while idx < self.digits && carry != 0 {
-            let (bucket_idx, digit_idx) = self.base.indexes(idx);
-            // TODO when destucturing is supported in assignment, change this :(
-            let (new_digit, new_carry) = self.base.add_digits(carry, self.get_digit(bucket_idx, digit_idx));
-            carry = new_carry;
-            self.set_digit(bucket_idx, digit_idx, new_digit);
-            idx += 1;
+        if self.digits.len() == 0 {
+            self.push_high(digit);
+            self.power = power;
+            return;
         }
-        if carry != 0 {
-            self.push_high(carry);
+        
+        match self.arithmetic_setup(power) {
+            Err(idx) => self.digits[idx] = digit, // We had to allocate - eg, digit is 0
+            Ok(mut idx) => {
+                let first_digit = self.digits[idx];
+                let (new_digit, mut carry) = self.base.add_digits(first_digit, digit);
+                self.digits[idx] = new_digit;
+                idx += 1;
+                while idx < self.digits.len() && carry != 0 {
+                    // TODO when destucturing is supported in assignment, change this :(
+                    let (new_digit, new_carry) = self.base.add_digits(carry, self.digits[idx]);
+                    carry = new_carry;
+                    self.digits[idx] = new_digit;
+                    idx += 1;
+                }
+                if carry != 0 {
+                    self.push_high(carry);
+                }
+            }
         }
     }
 //     pub fn sub_digit(&mut self, digit: Digit, power: usize) {
@@ -381,19 +255,6 @@ pub enum Sign {
 enum PowerIndexError {
     InsufficientDigitsHigh(usize),
     InsufficientDigitsLow(usize)
-}
-
-fn bitwise_parameters(base: u32) -> (usize, usize, usize) {
-    let base = base as usize;
-    let highest_digit = base - 1;
-    // TODO move to usize::BITS when the feature lands in stable
-    let usize_bits = 0usize.leading_zeros();
-
-    let digits_width = usize_bits - highest_digit.leading_zeros();
-    let digits_per_bucket = usize_bits / digits_width;
-    let mask = !(usize::MAX << digits_width as usize);
-
-    (digits_width as usize, digits_per_bucket as usize, mask)
 }
 
 #[cfg(test)]
@@ -467,9 +328,9 @@ pub mod test {
         let b = Base::new(10);
         let mut n = Number::new(&b);
         n.push_high(5);
-        assert_eq!(n.digits, 1);
+        assert_eq!(n.digits(), 1);
         n.push_low(1);
-        assert_eq!(n.digits, 2);
+        assert_eq!(n.digits(), 2);
     }
 
     #[test]
@@ -479,9 +340,9 @@ pub mod test {
         n.push_high(5);
         n.push_low(1);
         n.pop_high();
-        assert_eq!(n.digits, 1);
+        assert_eq!(n.digits(), 1);
         n.pop_low();
-        assert_eq!(n.digits, 0);
+        assert_eq!(n.digits(), 0);
     }
 
     #[test]
@@ -516,58 +377,6 @@ pub mod test {
         assert_eq!(n.pop_high(), Some(5));
 
         assert_eq!(n.pop_high(), None);
-        assert_eq!(n.pop_low(), None);
-    }
-
-    #[test]
-    fn pushing_high_past_bucket_boundary() {
-        let b = Base::new(10);
-        let mut n = Number::new(&b);
-        for _ in 0..(b.digits_per_bucket() + 1) {
-            n.push_high(1);
-        }
-        assert_eq!(
-            n.iter().collect::<Vec<_>>(),
-            (0..b.digits_per_bucket() + 1).map(|_| 1).collect::<Vec<_>>()
-        );
-    }
-
-    #[test]
-    fn pushing_low_past_bucket_boundary() {
-        let b = Base::new(10);
-        let mut n = Number::new(&b);
-        for _ in 0..(b.digits_per_bucket() + 1) {
-            n.push_low(1);
-        }
-        assert_eq!(
-            n.iter().collect::<Vec<_>>(),
-            (0..b.digits_per_bucket() + 1).map(|_| 1).collect::<Vec<_>>()
-        );
-    }
-
-    #[test]
-    fn popping_high_past_bucket_boundary() {
-        let b = Base::new(10);
-        let mut n = Number::new(&b);
-        for _ in 0..(b.digits_per_bucket() + 1) {
-            n.push_high(1);
-        }
-        for _ in 0..(b.digits_per_bucket() + 1) {
-            assert_eq!(n.pop_high(), Some(1));
-        }
-        assert_eq!(n.pop_high(), None);
-    }
-
-    #[test]
-    fn popping_low_past_bucket_boundary() {
-        let b = Base::new(10);
-        let mut n = Number::new(&b);
-        for _ in 0..(b.digits_per_bucket() + 1) {
-            n.push_high(1);
-        }
-        for _ in 0..(b.digits_per_bucket() + 1) {
-            assert_eq!(n.pop_low(), Some(1));
-        }
         assert_eq!(n.pop_low(), None);
     }
 
@@ -628,22 +437,6 @@ pub mod test {
         }
         n.add_digit(1, 0);
         assert_eq!(n.iter().collect::<Vec<_>>(), vec!(1,0,0,0));
-    }
-
-    #[test]
-    fn single_digit_addition_with_carry_across_bucket_boundary() {
-        let b = Base::new(10);
-        let mut n = Number::new(&b);
-        for _ in 0..b.digits_per_bucket() {
-            n.push_high(9);
-        }
-        n.add_digit(1, 0);
-        let mut expected = Vec::new();
-        expected.push(1);
-        for _ in 0..b.digits_per_bucket() {
-            expected.push(0);
-        }
-        assert_eq!(n.iter().collect::<Vec<_>>(), expected);
     }
 
     #[test]
