@@ -14,7 +14,7 @@ pub type Pair = (Digit, Digit);
 
 #[derive(Debug)]
 pub struct Base {
-    base: u32,
+    base: u32, // TODO move to usize
     addition_table: Vec<Pair>,
     multiplication_table: Vec<Pair>,
 }
@@ -66,6 +66,25 @@ impl<'base> Number<'base> {
             digits: VecDeque::with_capacity(digits),
             power: 0,
             sign: Sign::Positive,
+            base
+        }
+    }
+    pub fn from_usize(base: &'base Base, integer: usize) -> Self {
+        let digits = ConversionFromUsize::new(integer, base.base as usize).collect::<VecDeque<_>>();
+        Self {
+            digits,
+            power: 0,
+            sign: Sign::Positive,
+            base
+        }
+    }
+    pub fn from_isize(base: &'base Base, integer: isize) -> Self {
+        let digits = ConversionFromUsize::new(isize::abs(integer) as usize, base.base as usize).collect::<VecDeque<_>>();
+        let sign = if integer >= 0 { Sign::Positive } else { Sign::Negative };
+        Self {
+            digits,
+            power: 0,
+            sign,
             base
         }
     }
@@ -483,5 +502,30 @@ pub mod test {
         let mut n = Number::new(&b);
         n = n >> 1;
         assert_eq!(n.power(), -1);
+    }
+
+    /// Conversion
+
+    #[test]
+    fn conversion_from_usize() {
+        let b = Base::new(10);
+        let n = Number::from_usize(&b, 123);
+        assert_eq!(n.iter().collect::<Vec<_>>(), vec!(3, 2, 1));
+    }
+
+    #[test]
+    fn conversion_from_positive_isize() {
+        let b = Base::new(10);
+        let n = Number::from_isize(&b, 123);
+        assert_eq!(n.iter().collect::<Vec<_>>(), vec!(3, 2, 1));
+        assert!(n.positive());
+    }
+
+    #[test]
+    fn conversion_from_negative_isize() {
+        let b = Base::new(10);
+        let n = Number::from_isize(&b, -123);
+        assert_eq!(n.iter().collect::<Vec<_>>(), vec!(3, 2, 1));
+        assert!(n.negative());
     }
 }

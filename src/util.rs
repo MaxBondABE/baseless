@@ -83,6 +83,9 @@ impl Iterator for ConversionFromUsize {
         }
         Some(digit)
     }
+
+    // TODO implement size_hint by using log change of base to estimate the number
+    // of digits required
 }
 
 // Iterator which converts a number from any base to any other base
@@ -137,7 +140,7 @@ pub mod test {
     }
 
     #[test]
-    fn conversion_from_usive() {
+    fn conversion_from_usize() {
         assert_eq!(
             ConversionFromUsize::new(123, 10).collect::<Vec<_>>(),
             vec!(1, 2, 3)
