@@ -35,12 +35,12 @@ impl Base {
 
     /// Given two digits, returns the digits of their sum in the form of (first_digit,
     /// carry_digit).
-    pub fn add_digits(&self, a: Digit, b: Digit) -> Pair {
+    pub fn addition_lookup(&self, a: Digit, b: Digit) -> Pair {
         *self.addition_table.get(pair_index((a, b), self.base)).unwrap()
     }
     /// Given two digits, returns the digits of their product in the form of (first_digit,
     /// carry_digit).
-    pub fn multiply_digits(&self, a: Digit, b: Digit) -> Pair {
+    pub fn multiplication_lookup(&self, a: Digit, b: Digit) -> Pair {
         *self.multiplication_table.get(pair_index((a, b), self.base)).unwrap()
     }
 }
@@ -196,12 +196,12 @@ impl<'base> Number<'base> {
             Err(idx) => self.digits[idx] = digit, // We had to allocate - eg, digit is 0
             Ok(mut idx) => {
                 let first_digit = self.digits[idx];
-                let (new_digit, mut carry) = self.base.add_digits(first_digit, digit);
+                let (new_digit, mut carry) = self.base.addition_lookup(first_digit, digit);
                 self.digits[idx] = new_digit;
                 idx += 1;
                 while idx < self.digits.len() && carry != 0 {
                     // TODO when destucturing is supported in assignment, change this :(
-                    let (new_digit, new_carry) = self.base.add_digits(carry, self.digits[idx]);
+                    let (new_digit, new_carry) = self.base.addition_lookup(carry, self.digits[idx]);
                     carry = new_carry;
                     self.digits[idx] = new_digit;
                     idx += 1;
