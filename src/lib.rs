@@ -3,11 +3,13 @@
 pub mod util;
 pub mod iter;
 
-use std::collections::VecDeque;
+use std::collections::{VecDeque, vec_deque::Iter};
 use std::convert::TryFrom;
-use std::ops::{Shl, Shr};
+use std::ops::{Shl, Shr, Range};
+use std::iter::Map;
+
 use util::*;
-use iter::BorrowedNumberIter;
+use iter::*;
 
 pub type Digit = u8;
 pub type Pair = (Digit, Digit);
@@ -103,6 +105,9 @@ impl<'base> Number<'base> {
     }
     pub fn negative(&self) -> bool {
         self.sign == Sign::Negative
+    }
+    pub fn is_integer(&self) -> bool {
+        self.digits.len() == 0 || self.power >= 0
     }
 
     /// Vector API
@@ -242,8 +247,34 @@ impl<'base> Number<'base> {
         }
     }
 
-    pub fn iter(&self) -> BorrowedNumberIter {
-        BorrowedNumberIter::new(self)
+    pub fn digit_iter(&self) -> Map<Iter<'_, Digit>, fn(&u8) -> u8> {
+        self.digits.iter().map(|d| *d)
+    }
+
+    pub fn power_iter(&self) -> Range<isize> {
+        let low_power = self.power;
+        let high_power = isize::try_from(self.digits.len()).expect("Failed to convert usize to isize") + self.power;
+        low_power..high_power
+    }
+
+    pub fn digit_and_power_iter(&self) -> DigitAndPowerIter {
+        DigitAndPowerIter::new(self)
+    }
+
+    pub fn as_isize(&self) -> isize {
+        if !self.is_integer() {
+            panic!("Unable to convert to isize: number is not an integer");
+        }
+        let mut n = 0;
+        let base = self.base.base as isize;
+        for (digit, power) in self.digit_and_power_iter() {
+            // TODO make power i32?
+            n += base.pow(power as u32) * (digit as isize);
+        }
+        if self.negative() {
+            n = -n
+        }
+        n
     }
 }
 
@@ -288,7 +319,7 @@ pub mod test {
         let mut n = Number::new(&b);
         n.push_high(5);
         n.push_high(1);
-        assert_eq!(n.iter().collect::<Vec<_>>(), vec!(1, 5));
+        assert_eq!(n.digit_iter().rev().collect::<Vec<_>>(), vec!(1, 5));
     }
 
     #[test]
@@ -297,7 +328,7 @@ pub mod test {
         let mut n = Number::new(&b);
         n.push_low(1);
         n.push_low(5);
-        assert_eq!(n.iter().collect::<Vec<_>>(), vec!(1, 5));
+        assert_eq!(n.digit_iter().rev().collect::<Vec<_>>(), vec!(1, 5));
     }
 
     #[test]
@@ -329,7 +360,7 @@ pub mod test {
         n.push_high(5);
         n.push_high(1);
         assert_eq!(n.pop_high(), Some(1));
-        assert_eq!(n.iter().collect::<Vec<_>>(), vec!(5));
+        assert_eq!(n.digit_iter().rev().collect::<Vec<_>>(), vec!(5));
     }
 
     #[test]
@@ -339,7 +370,7 @@ pub mod test {
         n.push_low(5);
         n.push_low(1);
         assert_eq!(n.pop_low(), Some(1));
-        assert_eq!(n.iter().collect::<Vec<_>>(), vec!(5));
+        assert_eq!(n.digit_iter().rev().collect::<Vec<_>>(), vec!(5));
     }
 
     #[test]
@@ -369,13 +400,13 @@ pub mod test {
         let b = Base::new(10);
         let mut n = Number::new(&b);
         n.push_high(1);
-        assert_eq!(n.iter().collect::<Vec<_>>(), vec!(1));
+        assert_eq!(n.digit_iter().rev().collect::<Vec<_>>(), vec!(1));
         n.push_low(2);
-        assert_eq!(n.iter().collect::<Vec<_>>(), vec!(1, 2));
+        assert_eq!(n.digit_iter().rev().collect::<Vec<_>>(), vec!(1, 2));
         n.push_high(3);
-        assert_eq!(n.iter().collect::<Vec<_>>(), vec!(3, 1, 2));
+        assert_eq!(n.digit_iter().rev().collect::<Vec<_>>(), vec!(3, 1, 2));
         n.push_low(4);
-        assert_eq!(n.iter().collect::<Vec<_>>(), vec!(3, 1, 2, 4));
+        assert_eq!(n.digit_iter().rev().collect::<Vec<_>>(), vec!(3, 1, 2, 4));
     }
 
     #[test]
@@ -421,7 +452,7 @@ pub mod test {
         for i in (0..9).into_iter().rev() {
             n.set(i, (i+1) as Digit);
         }
-        assert_eq!(n.iter().collect::<Vec<_>>(), vec!(9, 8, 7, 6, 5, 4, 3, 2, 1));
+        assert_eq!(n.digit_iter().rev().collect::<Vec<_>>(), vec!(9, 8, 7, 6, 5, 4, 3, 2, 1));
     }
 
     #[test]
@@ -432,8 +463,7 @@ pub mod test {
             n.push_high(i);
         }
         n.set(9, 9);
-        assert_eq!(n.iter().collect::<Vec<_>>(), vec!(9, 8, 7, 6, 5, 4, 3, 2, 1, 0));
-        // TODO iter weirdness
+        assert_eq!(n.digit_iter().rev().collect::<Vec<_>>(), vec!(9, 8, 7, 6, 5, 4, 3, 2, 1, 0));
     }
 
     /// Arithmetic
@@ -444,7 +474,7 @@ pub mod test {
         let mut n = Number::new(&b);
         n.push_high(1);
         n.add_digit(1, 0);
-        assert_eq!(n.iter().collect::<Vec<_>>(), vec!(2));
+        assert_eq!(n.digit_iter().rev().collect::<Vec<_>>(), vec!(2));
     }
 
     #[test]
@@ -455,7 +485,7 @@ pub mod test {
             n.push_high(9);
         }
         n.add_digit(1, 0);
-        assert_eq!(n.iter().collect::<Vec<_>>(), vec!(1,0,0,0));
+        assert_eq!(n.digit_iter().rev().collect::<Vec<_>>(), vec!(1,0,0,0));
     }
 
     #[test]
@@ -467,7 +497,7 @@ pub mod test {
         n.push_high(9);
         n.push_high(1);
         n.add_digit(2, 0);
-        assert_eq!(n.iter().collect::<Vec<_>>(), vec!(2, 0, 0, 0));
+        assert_eq!(n.digit_iter().rev().collect::<Vec<_>>(), vec!(2, 0, 0, 0));
     }
 
     #[test]
@@ -476,7 +506,7 @@ pub mod test {
         let mut n = Number::new(&b);
         n.push_high(1);
         n.add_digit(2, 1);
-        assert_eq!(n.iter().collect::<Vec<_>>(), vec!(2, 1));
+        assert_eq!(n.digit_iter().rev().collect::<Vec<_>>(), vec!(2, 1));
     }
 
     #[test]
@@ -485,7 +515,7 @@ pub mod test {
         let mut n = Number::new(&b);
         n.push_high(1);
         n.add_digit(2, -1);
-        assert_eq!(n.iter().collect::<Vec<_>>(), vec!(1, 2));
+        assert_eq!(n.digit_iter().rev().collect::<Vec<_>>(), vec!(1, 2));
     }
 
     #[test]
@@ -504,20 +534,25 @@ pub mod test {
         assert_eq!(n.power(), -1);
     }
 
+//     proptest!(
+//         #[test]
+//         fn add_arbitrary_digit(digit in 
+//     )
+
     /// Conversion
 
     #[test]
     fn conversion_from_usize() {
         let b = Base::new(10);
         let n = Number::from_usize(&b, 123);
-        assert_eq!(n.iter().collect::<Vec<_>>(), vec!(3, 2, 1));
+        assert_eq!(n.digit_iter().rev().collect::<Vec<_>>(), vec!(3, 2, 1));
     }
 
     #[test]
     fn conversion_from_positive_isize() {
         let b = Base::new(10);
         let n = Number::from_isize(&b, 123);
-        assert_eq!(n.iter().collect::<Vec<_>>(), vec!(3, 2, 1));
+        assert_eq!(n.digit_iter().rev().collect::<Vec<_>>(), vec!(3, 2, 1));
         assert!(n.positive());
     }
 
@@ -525,7 +560,28 @@ pub mod test {
     fn conversion_from_negative_isize() {
         let b = Base::new(10);
         let n = Number::from_isize(&b, -123);
-        assert_eq!(n.iter().collect::<Vec<_>>(), vec!(3, 2, 1));
+        assert_eq!(n.digit_iter().rev().collect::<Vec<_>>(), vec!(3, 2, 1));
         assert!(n.negative());
+    }
+
+    #[test]
+    fn iter_digits_and_powers() {
+        let b = Base::new(10);
+        let n = Number::from_isize(&b, 123);
+        assert_eq!(n.digit_and_power_iter().collect::<Vec<_>>(), vec!((3, 0), (2, 1), (1, 2)));
+    }
+
+    #[test]
+    fn conversion_to_isize_positive() {
+        let b = Base::new(10);
+        let n = Number::from_isize(&b, 123);
+        assert_eq!(n.as_isize(), 123);
+    }
+
+    #[test]
+    fn conversion_to_isize_negative() {
+        let b = Base::new(10);
+        let n = Number::from_isize(&b, -123);
+        assert_eq!(n.as_isize(), -123);
     }
 }
