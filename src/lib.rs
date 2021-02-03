@@ -7,6 +7,7 @@ use std::collections::{VecDeque, vec_deque::Iter};
 use std::convert::TryFrom;
 use std::ops::{Shl, Shr, Range};
 use std::iter::Map;
+use std::fmt::Debug;
 
 use util::*;
 use iter::*;
@@ -14,7 +15,6 @@ use iter::*;
 pub type Digit = u8;
 pub type Pair = (Digit, Digit);
 
-#[derive(Debug)]
 pub struct Base {
     base: usize,
     addition_table: Vec<Pair>,
@@ -44,6 +44,13 @@ impl Base {
     /// carry_digit).
     pub fn multiplication_lookup(&self, a: Digit, b: Digit) -> Pair {
         *self.multiplication_table.get(pair_index((a, b), self.base)).unwrap()
+    }
+}
+impl Debug for Base {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Base").field("base", &self.base).finish()
+        // Don't print precomputation tables, as they can be very long & aren't
+        // normally interesting
     }
 }
 
