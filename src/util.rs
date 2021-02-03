@@ -22,6 +22,7 @@ fn carry_digits(computed: usize, base: usize) -> Pair {
     (result as Digit, carry as Digit)
 }
 
+// TODO make ExactSizeIterator
 /// Iterator used to build precomputation tables for addition and subtraction.
 pub struct ArithmeticPrecomputation {
     base: usize,
@@ -101,7 +102,7 @@ impl Iterator for ConversionFromUsize {
     }
 }
 
-// Iterator which converts a number from any base to any other base
+/// Iterator which converts a number from any base to any other base
 pub struct BaseConversion {
 }
 
