@@ -39,9 +39,29 @@ impl ArithmeticPrecomputation {
     }
 
 }
+impl Iterator for ArithmeticPrecomputation {
+    type Item = (Pair, Pair);
 
-// Iterator which calculates each digit required to represent a native integer
-// as 
+    fn next(&mut self) -> Option<Self::Item> {
+        let mut upper = self.upper.next();
+        if upper.is_none() {
+            self.current_lower = self.lower.next()?;
+            self.upper = self.current_lower..self.base;
+            upper = self.upper.next();
+        }
+        let upper = upper.unwrap();
+        let addition = self.current_lower + upper;
+        let multiplication = self.current_lower * upper;
+        Some((
+            carry_digits(addition, self.base),
+            carry_digits(multiplication, self.base)
+        ))
+    }
+}
+
+// TODO make ExactSizeIterator
+/// Iterator which calculates each digit required to represent a native integer
+/// as 
 pub struct ConversionFromUsize {
     integer: usize,
     base: usize,
@@ -88,26 +108,6 @@ impl Iterator for ConversionFromUsize {
 
 // Iterator which converts a number from any base to any other base
 pub struct BaseConversion {
-}
-
-impl Iterator for ArithmeticPrecomputation {
-    type Item = (Pair, Pair);
-
-    fn next(&mut self) -> Option<Self::Item> {
-        let mut upper = self.upper.next();
-        if upper.is_none() {
-            self.current_lower = self.lower.next()?;
-            self.upper = self.current_lower..self.base;
-            upper = self.upper.next();
-        }
-        let upper = upper.unwrap();
-        let addition = self.current_lower + upper;
-        let multiplication = self.current_lower * upper;
-        Some((
-            carry_digits(addition, self.base),
-            carry_digits(multiplication, self.base)
-        ))
-    }
 }
 
 #[cfg(test)]
