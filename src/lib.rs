@@ -16,12 +16,12 @@ pub type Pair = (Digit, Digit);
 
 #[derive(Debug)]
 pub struct Base {
-    base: u32, // TODO move to usize
+    base: usize,
     addition_table: Vec<Pair>,
     multiplication_table: Vec<Pair>,
 }
 impl Base {
-    pub fn new(base: u32) -> Self {
+    pub fn new(base: usize) -> Self {
         let mut addition_table = Vec::new(); // TODO capacity
         let mut multiplication_table = Vec::new();
         for (add, mul) in ArithmeticPrecomputation::new(base) {
@@ -72,7 +72,7 @@ impl<'base> Number<'base> {
         }
     }
     pub fn from_usize(base: &'base Base, integer: usize) -> Self {
-        let digits = ConversionFromUsize::new(integer, base.base as usize).collect::<VecDeque<_>>();
+        let digits = ConversionFromUsize::new(integer, base.base).collect::<VecDeque<_>>();
         Self {
             digits,
             power: 0,
@@ -81,7 +81,7 @@ impl<'base> Number<'base> {
         }
     }
     pub fn from_isize(base: &'base Base, integer: isize) -> Self {
-        let digits = ConversionFromUsize::new(isize::abs(integer) as usize, base.base as usize).collect::<VecDeque<_>>();
+        let digits = ConversionFromUsize::new(isize::abs(integer) as usize, base.base).collect::<VecDeque<_>>();
         let sign = if integer >= 0 { Sign::Positive } else { Sign::Negative };
         Self {
             digits,

@@ -8,9 +8,8 @@ pub fn normalize_pair(pair: Pair) -> Pair {
 }
 
 /// Returns the index of a given pair in a precomputation table
-pub fn pair_index(pair: Pair, base: u32) -> usize {
+pub fn pair_index(pair: Pair, base: usize) -> usize {
     let pair = normalize_pair(pair);
-    let base = base as usize;
     let lower = pair.0 as usize;
     let upper = pair.1 as usize;
 
@@ -32,8 +31,7 @@ pub struct ArithmeticPrecomputation {
 }
 
 impl ArithmeticPrecomputation {
-    pub fn new(base: u32) -> Self {
-        let base = base as usize;
+    pub fn new(base: usize) -> Self {
         let mut lower = 0..base;
         let upper = 0..base;
         let current_lower = lower.next().unwrap();
