@@ -70,10 +70,7 @@ pub struct ConversionFromUsize {
 }
 impl ConversionFromUsize {
     pub fn new(integer: usize, base: usize) -> Self {
-        let mut power = 0;
-        while base.pow(power + 1) < integer {
-            power += 1;
-        }
+        let power = (integer as f64).log(base as f64).floor() as u32;
         Self {
             integer,
             base,
@@ -89,11 +86,12 @@ impl Iterator for ConversionFromUsize {
         if self.done {
             return None;
         }
+        let place = self.base.pow(self.power);
         let mut digit = 0;
-        while ((digit + 1) as usize) * self.base.pow(self.power) <= self.integer {
+        while self.integer >= place {
             digit += 1;
+            self.integer -= place;
         }
-        self.integer -= (digit as usize) * self.base.pow(self.power);
         if self.power > 0 {
             self.power -= 1;
         } else {
@@ -101,9 +99,6 @@ impl Iterator for ConversionFromUsize {
         }
         Some(digit)
     }
-
-    // TODO implement size_hint by using log change of base to estimate the number
-    // of digits required
 }
 
 // Iterator which converts a number from any base to any other base
