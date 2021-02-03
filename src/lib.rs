@@ -62,6 +62,9 @@ pub struct Number<'base> {
     base: &'base Base
 }
 impl<'base> Number<'base> {
+
+    /// Initialization
+
     pub fn new(base: &'base Base) -> Self {
         Self {
             digits: VecDeque::new(),
@@ -98,8 +101,12 @@ impl<'base> Number<'base> {
         }
     }
 
+    /// Informational
+
     pub fn digits(&self) -> usize {
         self.digits.len()
+        // TODO rename to significant_digits(), make new function that takes power
+        // into account for digits()
     }
     pub fn power(&self) -> isize {
         self.power
@@ -115,6 +122,13 @@ impl<'base> Number<'base> {
     }
     pub fn is_integer(&self) -> bool {
         self.digits.len() == 0 || self.power >= 0
+        // TODO check if fractional part is 0
+    }
+    pub fn floor(&mut self) {
+        todo!()
+    }
+    pub fn ceil(&mut self) {
+        todo!()
     }
 
     /// Vector API
@@ -231,7 +245,7 @@ impl<'base> Number<'base> {
                 self.digits[idx] = new_digit;
                 idx += 1;
                 while idx < self.digits.len() && carry != 0 {
-                    // TODO when destucturing is supported in assignment, change this :(
+                    // TODO when destucturing assignment is released, change this :(
                     let (new_digit, new_carry) = self.base.addition_lookup(carry, self.digits[idx]);
                     carry = new_carry;
                     self.digits[idx] = new_digit;
@@ -254,6 +268,8 @@ impl<'base> Number<'base> {
         }
     }
 
+    /// Iteration
+
     pub fn digit_iter(&self) -> Map<Iter<'_, Digit>, fn(&u8) -> u8> {
         self.digits.iter().map(|d| *d)
     }
@@ -267,6 +283,8 @@ impl<'base> Number<'base> {
     pub fn digit_and_power_iter(&self) -> DigitAndPowerIter {
         DigitAndPowerIter::new(self)
     }
+
+    /// Conversion
 
     pub fn as_isize(&self) -> isize {
         if !self.is_integer() {
