@@ -350,6 +350,7 @@ enum PowerIndexError {
 #[cfg(test)]
 pub mod test {
     use super::*;
+    use proptest::prelude::*;
 
     /// Number Vector API
 
@@ -574,6 +575,36 @@ pub mod test {
         assert_eq!(n.power(), -1);
     }
 
+    proptest!(
+        #[test]
+        fn add_arbitrary_digit_to_positive_number(
+            ((base, digit, power), number) in 
+            (base_digit_power_with_power_gt_0(), any::<usize>())
+                .prop_filter(
+                    "Do not cause overflow",
+                    |((base, digit, power), number)|
+                        (base.base.pow(*power as u32) as usize) * (*digit as usize) < usize::MAX - number
+                )
+        ) {
+            let mut n = Number::from_usize(&base, number);
+            n.add_digit(digit, power);
+            let expected = number + (base.base.pow(power as u32) as usize) * (digit as usize);
+            prop_assert!(n.as_usize() == expected)
+        }
+
+        #[test]
+        fn from_usize_and_as_usize_are_inverse((base, number) in (arbitrary_base(), any::<usize>())) {
+            let n = Number::from_usize(&base, number);
+            prop_assert!(n.as_usize() == number);
+        }
+
+        #[test]
+        fn from_isize_and_as_isize_are_inverse((base, number) in (arbitrary_base(), any::<isize>())) {
+            let n = Number::from_isize(&base, number);
+            prop_assert!(n.as_isize() == number);
+        }
+    );
+
 //     proptest!(
 //         #[test]
 //         fn add_arbitrary_digit(digit in 
@@ -629,5 +660,39 @@ pub mod test {
         let b = Base::new(10);
         let n = Number::from_isize(&b, -123);
         assert_eq!(n.as_isize(), -123);
+    }
+
+    /// Proptest Util
+
+    // TODO better name
+    fn base_digit_power_with_power_gt_0() -> impl Strategy<Value=(Base, u8, isize)> {
+        (
+            any::<u8>().prop_filter(
+                "Base must be > 1",
+                |base| *base > 1
+            ),
+            any::<u8>(),
+            any::<u8>()
+        )
+        .prop_filter(
+            "Do not cause overflow with exponentiation",
+            |(base, _, power)| (*power as usize) < ((usize::MAX as f64).log(*base as f64)) as usize
+        )
+        .prop_filter(
+            "Do not cause overflow with multiplcation",
+            |(base, digit, power)| (*digit as usize) < usize::MAX / (*base as usize).pow(*power as u32)
+        )
+        .prop_map(|(base, digit, power)| (Base::new(base as usize), digit % base, power as isize))
+    }
+
+    fn arbitrary_base() -> impl Strategy<Value=Base> {
+        any::<u8>()
+        .prop_filter(
+            "Base must be > 1",
+            |base| *base > 1
+        )
+        .prop_map(
+            |base| Base::new(base as usize)
+        )
     }
 }
