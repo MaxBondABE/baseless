@@ -1,7 +1,7 @@
 use std::cmp::{min,max};
 use std::ops::Range;
 
-use crate::Pair;
+use crate::{Digit, Pair};
 
 pub fn normalize_pair(pair: Pair) -> Pair {
     return (min(pair.0, pair.1), max(pair.0, pair.1))
@@ -19,7 +19,7 @@ pub fn pair_index(pair: Pair, base: usize) -> usize {
 fn carry_digits(computed: usize, base: usize) -> Pair {
     let carry = computed / base;
     let result = computed - (carry * base);
-    (result as u8, carry as u8)
+    (result as Digit, carry as Digit)
 }
 
 /// Iterator used to build precomputation tables for addition and subtraction.
@@ -63,7 +63,7 @@ impl ConversionFromUsize {
     }
 }
 impl Iterator for ConversionFromUsize {
-    type Item = u8;
+    type Item = Digit;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.done {
