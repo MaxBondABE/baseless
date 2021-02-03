@@ -301,6 +301,21 @@ impl<'base> Number<'base> {
         }
         n
     }
+
+    pub fn as_usize(&self) -> usize {
+        if !self.is_integer() {
+            panic!("Unable to convert to usize: number is not an integer");
+        }
+        if !self.positive() {
+            panic!("Unable to convert to usize: number is negative");
+        }
+        let mut n = 0;
+        let base = self.base.base as usize;
+        for (digit, power) in self.digit_and_power_iter() {
+            n += base.pow(power as u32) * (digit as usize);
+        }
+        n
+    }
 }
 
 impl Shl<usize> for Number<'_> {
@@ -570,14 +585,20 @@ pub mod test {
     fn conversion_from_usize() {
         let b = Base::new(10);
         let n = Number::from_usize(&b, 123);
-        assert_eq!(n.digit_iter().rev().collect::<Vec<_>>(), vec!(3, 2, 1));
+        assert_eq!(n.digit_iter().rev().collect::<Vec<_>>(), vec!(1, 2, 3));
+    }
+
+    #[test]
+    fn conversion_from_usize_max() {
+        let b = Base::new(10);
+        let _n = Number::from_usize(&b, usize::MAX);
     }
 
     #[test]
     fn conversion_from_positive_isize() {
         let b = Base::new(10);
         let n = Number::from_isize(&b, 123);
-        assert_eq!(n.digit_iter().rev().collect::<Vec<_>>(), vec!(3, 2, 1));
+        assert_eq!(n.digit_iter().rev().collect::<Vec<_>>(), vec!(1, 2, 3));
         assert!(n.positive());
     }
 
@@ -585,7 +606,7 @@ pub mod test {
     fn conversion_from_negative_isize() {
         let b = Base::new(10);
         let n = Number::from_isize(&b, -123);
-        assert_eq!(n.digit_iter().rev().collect::<Vec<_>>(), vec!(3, 2, 1));
+        assert_eq!(n.digit_iter().rev().collect::<Vec<_>>(), vec!(1, 2, 3));
         assert!(n.negative());
     }
 
