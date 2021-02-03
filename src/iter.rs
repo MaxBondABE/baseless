@@ -1,17 +1,17 @@
 use std::collections::vec_deque::Iter;
 use std::ops::Range;
-use std::iter::{Map, Rev};
+use std::iter::Map;
 
 use crate::{Number, Digit};
 
 pub struct DigitAndPowerIter<'number> {
-    digit_iter: Rev<Map<Iter<'number, Digit>, fn(&u8) -> u8>>,
+    digit_iter: Map<Iter<'number, Digit>, fn(&Digit) -> Digit>,
     power_iter: Range<isize>
 }
 impl<'number> DigitAndPowerIter<'number> {
     pub fn new(number: &'number Number<'number>) -> Self {
         Self {
-            digit_iter: number.digit_iter().rev(),
+            digit_iter: number.digit_iter(),
             power_iter: number.power_iter()
         }
     }

@@ -72,7 +72,7 @@ impl<'base> Number<'base> {
         }
     }
     pub fn from_usize(base: &'base Base, integer: usize) -> Self {
-        let digits = ConversionFromUsize::new(integer, base.base).collect::<VecDeque<_>>();
+        let digits = reverse(ConversionFromUsize::new(integer, base.base).collect::<VecDeque<_>>());
         Self {
             digits,
             power: 0,
@@ -81,7 +81,7 @@ impl<'base> Number<'base> {
         }
     }
     pub fn from_isize(base: &'base Base, integer: isize) -> Self {
-        let digits = ConversionFromUsize::new(isize::abs(integer) as usize, base.base).collect::<VecDeque<_>>();
+        let digits = reverse(ConversionFromUsize::new(isize::abs(integer) as usize, base.base).collect::<VecDeque<_>>());
         let sign = if integer >= 0 { Sign::Positive } else { Sign::Negative };
         Self {
             digits,

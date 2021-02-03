@@ -1,5 +1,6 @@
 use std::cmp::{min,max};
 use std::ops::Range;
+use std::collections::VecDeque;
 
 use crate::{Digit, Pair};
 
@@ -20,6 +21,14 @@ fn carry_digits(computed: usize, base: usize) -> Pair {
     let carry = computed / base;
     let result = computed - (carry * base);
     (result as Digit, carry as Digit)
+}
+
+pub fn reverse(mut v: VecDeque<Digit>) -> VecDeque<Digit> {
+    let half = v.len()/2;
+    for (a, b) in (0..half).zip((half..v.len()).into_iter().rev()) {
+        v.swap(a, b);
+    }
+    v
 }
 
 // TODO make ExactSizeIterator
@@ -141,4 +150,15 @@ pub mod test {
         );
     }
 
+    #[test]
+    fn reverse_even_list() {
+        let v = reverse((1..=4).collect::<VecDeque<Digit>>());
+        assert_eq!(v, vec!(4, 3, 2, 1));
+    }
+
+    #[test]
+    fn reverse_odd_list() {
+        let v = reverse((1..=5).collect::<VecDeque<Digit>>());
+        assert_eq!(v, vec!(5, 4, 3, 2, 1));
+    }
 }
