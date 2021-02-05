@@ -7,65 +7,24 @@ use std::collections::{VecDeque, vec_deque::Iter};
 use std::convert::TryFrom;
 use std::ops::{Shl, Shr, Range};
 use std::iter::Map;
-use std::fmt::Debug;
 
 use util::*;
 use iter::*;
 
 pub type Digit = u8;
-pub type Pair = (Digit, Digit);
-
-pub struct Base {
-    base: usize,
-    addition_table: Vec<Pair>,
-    multiplication_table: Vec<Pair>,
-}
-impl Base {
-    pub fn new(base: usize) -> Self {
-        let mut addition_table = Vec::new(); // TODO capacity
-        let mut multiplication_table = Vec::new();
-        for (add, mul) in ArithmeticPrecomputation::new(base) {
-            addition_table.push(add);
-            multiplication_table.push(mul);
-        }
-        Self {
-            base,
-            addition_table,
-            multiplication_table,
-        }
-    }
-
-    /// Given two digits, returns the digits of their sum in the form of (first_digit,
-    /// carry_digit).
-    pub fn addition_lookup(&self, a: Digit, b: Digit) -> Pair {
-        *self.addition_table.get(pair_index((a, b), self.base)).unwrap()
-    }
-    /// Given two digits, returns the digits of their product in the form of (first_digit,
-    /// carry_digit).
-    pub fn multiplication_lookup(&self, a: Digit, b: Digit) -> Pair {
-        *self.multiplication_table.get(pair_index((a, b), self.base)).unwrap()
-    }
-}
-impl Debug for Base {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Base").field("base", &self.base).finish()
-        // Don't print precomputation tables, as they can be very long & aren't
-        // normally interesting
-    }
-}
 
 #[derive(Debug)]
-pub struct Number<'base> {
+pub struct Number {
     digits: VecDeque<Digit>,
     power: isize,
     sign: Sign,
-    base: &'base Base
+    base: usize
 }
-impl<'base> Number<'base> {
+impl Number {
 
     /// Initialization
 
-    pub fn new(base: &'base Base) -> Self {
+    pub fn new(base: usize) -> Self {
         Self {
             digits: VecDeque::new(),
             power: 0,
@@ -73,7 +32,7 @@ impl<'base> Number<'base> {
             base
         }
     }
-    pub fn with_capacity(base: &'base Base, digits: usize) -> Self {
+    pub fn with_capacity(base: usize, digits: usize) -> Self {
         Self {
             digits: VecDeque::with_capacity(digits),
             power: 0,
@@ -81,8 +40,8 @@ impl<'base> Number<'base> {
             base
         }
     }
-    pub fn from_usize(base: &'base Base, integer: usize) -> Self {
-        let digits = reverse(ConversionFromUsize::new(integer, base.base).collect::<VecDeque<_>>());
+    pub fn from_usize(base: usize, integer: usize) -> Self {
+        let digits = reverse(ConversionFromUsize::new(integer, base).collect::<VecDeque<_>>());
         Self {
             digits,
             power: 0,
@@ -90,8 +49,7 @@ impl<'base> Number<'base> {
             base
         }
     }
-    pub fn from_isize(base: &'base Base, integer: isize) -> Self {
-        let digits = reverse(ConversionFromUsize::new(isize::abs(integer) as usize, base.base).collect::<VecDeque<_>>());
+    pub fn from_isize(base: usize, integer: isize) -> Self {
         let sign = if integer >= 0 { Sign::Positive } else { Sign::Negative };
         Self {
             digits,
@@ -291,10 +249,9 @@ impl<'base> Number<'base> {
             panic!("Unable to convert to isize: number is not an integer");
         }
         let mut n = 0;
-        let base = self.base.base as isize;
         for (digit, power) in self.digit_and_power_iter() {
             // TODO make power i32?
-            n += base.pow(power as u32) * (digit as isize);
+            n += self.base.pow(power as u32) * (digit as usize);
         }
         if self.negative() {
             n = -n
@@ -310,15 +267,14 @@ impl<'base> Number<'base> {
             panic!("Unable to convert to usize: number is negative");
         }
         let mut n = 0;
-        let base = self.base.base as usize;
         for (digit, power) in self.digit_and_power_iter() {
-            n += base.pow(power as u32) * (digit as usize);
+            n += self.base.pow(power as u32) * (digit as usize);
         }
         n
     }
 }
 
-impl Shl<usize> for Number<'_> {
+impl Shl<usize> for Number {
     type Output = Self;
 
     fn shl(mut self, rhs: usize) -> Self::Output {
@@ -327,7 +283,7 @@ impl Shl<usize> for Number<'_> {
     }
 }
 
-impl Shr<usize> for Number<'_> {
+impl Shr<usize> for Number {
     type Output = Self;
 
     fn shr(mut self, rhs: usize) -> Self::Output {
@@ -350,14 +306,12 @@ enum PowerIndexError {
 #[cfg(test)]
 pub mod test {
     use super::*;
-    use proptest::prelude::*;
 
     /// Number Vector API
 
     #[test]
     fn push_high_puts_digit_on_left() {
-        let b = Base::new(10);
-        let mut n = Number::new(&b);
+        let mut n = Number::new(10);
         n.push_high(5);
         n.push_high(1);
         assert_eq!(n.digit_iter().rev().collect::<Vec<_>>(), vec!(1, 5));
@@ -365,8 +319,7 @@ pub mod test {
 
     #[test]
     fn push_low_puts_digit_on_right() {
-        let b = Base::new(10);
-        let mut n = Number::new(&b);
+        let mut n = Number::new(10);
         n.push_low(1);
         n.push_low(5);
         assert_eq!(n.digit_iter().rev().collect::<Vec<_>>(), vec!(1, 5));
@@ -374,8 +327,7 @@ pub mod test {
 
     #[test]
     fn pop_high_takes_digits_from_right() {
-        let b = Base::new(10);
-        let mut n = Number::new(&b);
+        let mut n = Number::new(10);
         n.push_high(5);
         n.push_high(1);
         assert_eq!(n.pop_high(), Some(1));
@@ -385,8 +337,7 @@ pub mod test {
 
     #[test]
     fn pop_low_takes_digits_from_left() {
-        let b = Base::new(10);
-        let mut n = Number::new(&b);
+        let mut n = Number::new(10);
         n.push_low(1);
         n.push_low(5);
         assert_eq!(n.pop_low(), Some(5));
@@ -396,8 +347,7 @@ pub mod test {
 
     #[test]
     fn push_high_and_pop_high_are_inverse() {
-        let b = Base::new(10);
-        let mut n = Number::new(&b);
+        let mut n = Number::new(10);
         n.push_high(5);
         n.push_high(1);
         assert_eq!(n.pop_high(), Some(1));
@@ -406,8 +356,7 @@ pub mod test {
 
     #[test]
     fn push_low_and_pop_low_are_inverse() {
-        let b = Base::new(10);
-        let mut n = Number::new(&b);
+        let mut n = Number::new(10);
         n.push_low(5);
         n.push_low(1);
         assert_eq!(n.pop_low(), Some(1));
@@ -416,8 +365,7 @@ pub mod test {
 
     #[test]
     fn pushing_increases_digits() {
-        let b = Base::new(10);
-        let mut n = Number::new(&b);
+        let mut n = Number::new(10);
         n.push_high(5);
         assert_eq!(n.digits(), 1);
         n.push_low(1);
@@ -426,8 +374,7 @@ pub mod test {
 
     #[test]
     fn popping_reduces_digits() {
-        let b = Base::new(10);
-        let mut n = Number::new(&b);
+        let mut n = Number::new(10);
         n.push_high(5);
         n.push_low(1);
         n.pop_high();
@@ -438,8 +385,7 @@ pub mod test {
 
     #[test]
     fn alternating_pushing_high_and_low() {
-        let b = Base::new(10);
-        let mut n = Number::new(&b);
+        let mut n = Number::new(10);
         n.push_high(1);
         assert_eq!(n.digit_iter().rev().collect::<Vec<_>>(), vec!(1));
         n.push_low(2);
@@ -452,8 +398,7 @@ pub mod test {
 
     #[test]
     fn alternating_popping_high_and_low() {
-        let b = Base::new(10);
-        let mut n = Number::new(&b);
+        let mut n = Number::new(10);
         for i in 1..=9 {
             n.push_low(i);
         }
@@ -473,8 +418,7 @@ pub mod test {
 
     #[test]
     fn get_returns_correct_digit() {
-        let b = Base::new(10);
-        let mut n = Number::new(&b);
+        let mut n = Number::new(10);
         for i in 1..=9 {
             n.push_high(i);
         }
@@ -485,8 +429,7 @@ pub mod test {
 
     #[test]
     fn set_alters_correct_digit() {
-        let b = Base::new(10);
-        let mut n = Number::new(&b);
+        let mut n = Number::new(10);
         for i in 0..9 {
             n.push_high(i);
         }
@@ -498,8 +441,7 @@ pub mod test {
 
     #[test]
     fn set_can_alter_1_digit_past_last_digit() {
-        let b = Base::new(10);
-        let mut n = Number::new(&b);
+        let mut n = Number::new(10);
         for i in 0..9 {
             n.push_high(i);
         }

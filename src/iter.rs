@@ -9,7 +9,7 @@ pub struct DigitAndPowerIter<'number> {
     power_iter: Range<isize>
 }
 impl<'number> DigitAndPowerIter<'number> {
-    pub fn new(number: &'number Number<'number>) -> Self {
+    pub fn new(number: &'number Number) -> Self {
         Self {
             digit_iter: number.digit_iter(),
             power_iter: number.power_iter()
