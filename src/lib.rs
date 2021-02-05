@@ -452,23 +452,17 @@ pub mod test {
     /// Arithmetic
 
     #[test]
-    fn single_digit_addition() {
-        let b = Base::new(10);
-        let mut n = Number::new(&b);
-        n.push_high(1);
-        n.add_digit(1, 0);
-        assert_eq!(n.digit_iter().rev().collect::<Vec<_>>(), vec!(2));
+    fn shift_left_increases_power() {
+        let mut n = Number::new(10);
+        n = n << 1;
+        assert_eq!(n.power(), 1);
     }
 
     #[test]
-    fn single_digit_addition_with_carry() {
-        let b = Base::new(10);
-        let mut n = Number::new(&b);
-        for _ in 0..3 {
-            n.push_high(9);
-        }
-        n.add_digit(1, 0);
-        assert_eq!(n.digit_iter().rev().collect::<Vec<_>>(), vec!(1,0,0,0));
+    fn shift_right_decreases_power() {
+        let mut n = Number::new(10);
+        n = n >> 1;
+        assert_eq!(n.power(), -1);
     }
 
     #[test]
@@ -556,85 +550,119 @@ pub mod test {
 
     #[test]
     fn conversion_from_usize() {
-        let b = Base::new(10);
-        let n = Number::from_usize(&b, 123);
+        let n = Number::from_isize(10, 123);
         assert_eq!(n.digit_iter().rev().collect::<Vec<_>>(), vec!(1, 2, 3));
     }
 
     #[test]
-    fn conversion_from_usize_max() {
-        let b = Base::new(10);
-        let _n = Number::from_usize(&b, usize::MAX);
+    fn conversion_from_usize_max_does_not_overflow() {
+        let n = Number::from_usize(10, usize::MAX);
+        n.as_usize();
+    }
+
+    #[test]
+    fn conversion_from_isize_max_does_not_overflow() {
+        let n = Number::from_isize(10, isize::MAX);
+        n.as_isize();
+    }
+
+    #[test]
+    fn conversion_from_isize_min_does_not_overflow() {
+        let n = Number::from_isize(10, isize::MIN);
+        n.as_isize();
     }
 
     #[test]
     fn conversion_from_positive_isize() {
-        let b = Base::new(10);
-        let n = Number::from_isize(&b, 123);
+        let n = Number::from_isize(10, 123);
         assert_eq!(n.digit_iter().rev().collect::<Vec<_>>(), vec!(1, 2, 3));
         assert!(n.positive());
     }
 
     #[test]
     fn conversion_from_negative_isize() {
-        let b = Base::new(10);
-        let n = Number::from_isize(&b, -123);
+        let n = Number::from_isize(10, -123);
         assert_eq!(n.digit_iter().rev().collect::<Vec<_>>(), vec!(1, 2, 3));
         assert!(n.negative());
     }
 
     #[test]
     fn iter_digits_and_powers() {
-        let b = Base::new(10);
-        let n = Number::from_isize(&b, 123);
+        let n = Number::from_isize(10, 123);
         assert_eq!(n.digit_and_power_iter().collect::<Vec<_>>(), vec!((3, 0), (2, 1), (1, 2)));
     }
 
     #[test]
     fn conversion_to_isize_positive() {
-        let b = Base::new(10);
-        let n = Number::from_isize(&b, 123);
+        let n = Number::from_isize(10, 123);
         assert_eq!(n.as_isize(), 123);
     }
 
     #[test]
     fn conversion_to_isize_negative() {
-        let b = Base::new(10);
-        let n = Number::from_isize(&b, -123);
+        let n = Number::from_isize(10, -123);
         assert_eq!(n.as_isize(), -123);
     }
 
-    /// Proptest Util
+}
 
-    // TODO better name
-    fn base_digit_power_with_power_gt_0() -> impl Strategy<Value=(Base, u8, isize)> {
-        (
-            any::<u8>().prop_filter(
-                "Base must be > 1",
-                |base| *base > 1
-            ),
-            any::<u8>(),
-            any::<u8>()
-        )
-        .prop_filter(
-            "Do not cause overflow with exponentiation",
-            |(base, _, power)| (*power as usize) < ((usize::MAX as f64).log(*base as f64)) as usize
-        )
-        .prop_filter(
-            "Do not cause overflow with multiplcation",
-            |(base, digit, power)| (*digit as usize) < usize::MAX / (*base as usize).pow(*power as u32)
-        )
-        .prop_map(|(base, digit, power)| (Base::new(base as usize), digit % base, power as isize))
-    }
+#[cfg(test)]
+pub mod property_tests {
+    use super::*;
+    use proptest::prelude::*;
 
-    fn arbitrary_base() -> impl Strategy<Value=Base> {
+    proptest!(
+        #[test]
+        fn from_usize_and_as_usize_are_inverse((base, number) in (arbitrary_base(), any::<usize>())) {
+            let n = Number::from_usize(base, number);
+            prop_assert!(n.as_usize() == number);
+        }
+
+        #[test]
+        fn from_isize_and_as_isize_are_inverse((base, number) in (arbitrary_base(), any::<isize>())) {
+            let n = Number::from_isize(base, number);
+            prop_assert!(n.as_isize() == number);
+        }
+
+//         #[test]
+//         fn arbitrary_complements() {
+//         }
+
+    );
+
+    /// Strategies
+
+//     // TODO better name
+//     fn base_digit_power_with_power_gt_0() -> impl Strategy<Value=(Base, u8, isize)> {
+//         (
+//             any::<u8>().prop_filter(
+//                 "Base must be > 1",
+//                 |base| *base > 1
+//             ),
+//             any::<u8>(),
+//             any::<u8>()
+//         )
+//         .prop_filter(
+//             "Do not cause overflow with exponentiation",
+//             |(base, _, power)| (*power as usize) < ((isize::MAX as f64).log(*base as f64)) as usize
+//         )
+//         .prop_filter(
+//             "Do not cause overflow with multiplcation",
+//             |(base, digit, power)| (*digit as isize) < isize::MAX / (*base as isize).pow(*power as u32)
+//         )
+//     }
+
+    fn arbitrary_base() -> impl Strategy<Value=usize> {
         any::<u8>()
         .prop_filter(
             "Base must be > 1",
             |base| *base > 1
         )
-        .prop_map(
-            |base| Base::new(base as usize)
-        )
+        .prop_map(|base| base as usize)
+    }
+
+    fn arbitray_positive_integer() -> impl Strategy<Value=Number> {
+        (arbitrary_base(), any::<usize>())
+        .prop_map(|(base, number)| Number::from_usize(base, number))
     }
 }
