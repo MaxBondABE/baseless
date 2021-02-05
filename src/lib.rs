@@ -498,85 +498,41 @@ pub mod test {
     }
 
     #[test]
-    fn single_digit_addition_with_carry_that_does_not_travel_all_the_way() {
-        let b = Base::new(10);
-        let mut n = Number::new(&b);
-        n.push_high(8);
-        n.push_high(9);
-        n.push_high(9);
-        n.push_high(1);
-        n.add_digit(2, 0);
-        assert_eq!(n.digit_iter().rev().collect::<Vec<_>>(), vec!(2, 0, 0, 0));
+    fn complement() {
+        let mut n = Number::from_isize(10, 123);
+        n.complement();
+        assert_eq!(n.as_usize(), 877);
     }
 
     #[test]
-    fn single_digit_addition_with_new_digit_high() {
-        let b = Base::new(10);
-        let mut n = Number::new(&b);
-        n.push_high(1);
-        n.add_digit(2, 1);
-        assert_eq!(n.digit_iter().rev().collect::<Vec<_>>(), vec!(2, 1));
+    fn complement_of_1_is_highest_digit() {
+
+        let mut n = Number::from_isize(10, 1);
+        n.complement();
+        assert_eq!(n.as_usize(), 9);
     }
 
     #[test]
-    fn single_digit_addition_with_new_digit_low() {
-        let b = Base::new(10);
-        let mut n = Number::new(&b);
-        n.push_high(1);
-        n.add_digit(2, -1);
-        assert_eq!(n.digit_iter().rev().collect::<Vec<_>>(), vec!(1, 2));
+    fn complement_of_zero_is_zero() {
+        let mut n = Number::from_isize(10, 0);
+        n.complement();
+        assert_eq!(n.as_usize(), 0);
     }
 
     #[test]
-    fn shift_left_increases_power() {
-        let b = Base::new(10);
-        let mut n = Number::new(&b);
-        n = n << 1;
-        assert_eq!(n.power(), 1);
+    fn complement_with_zero_digit() {
+        let mut n = Number::from_isize(10, 1203);
+        n.complement();
+        assert_eq!(n.as_usize(), 8797);
     }
 
     #[test]
-    fn shift_right_decreases_power() {
-        let b = Base::new(10);
-        let mut n = Number::new(&b);
-        n = n >> 1;
-        assert_eq!(n.power(), -1);
+    fn complement_with_many_zeros() {
+
+        let mut n = Number::from_isize(10, 1200003);
+        n.complement();
+        assert_eq!(n.as_usize(), 8799997);
     }
-
-    proptest!(
-        #[test]
-        fn add_arbitrary_digit_to_positive_number(
-            ((base, digit, power), number) in 
-            (base_digit_power_with_power_gt_0(), any::<usize>())
-                .prop_filter(
-                    "Do not cause overflow",
-                    |((base, digit, power), number)|
-                        (base.base.pow(*power as u32) as usize) * (*digit as usize) < usize::MAX - number
-                )
-        ) {
-            let mut n = Number::from_usize(&base, number);
-            n.add_digit(digit, power);
-            let expected = number + (base.base.pow(power as u32) as usize) * (digit as usize);
-            prop_assert!(n.as_usize() == expected)
-        }
-
-        #[test]
-        fn from_usize_and_as_usize_are_inverse((base, number) in (arbitrary_base(), any::<usize>())) {
-            let n = Number::from_usize(&base, number);
-            prop_assert!(n.as_usize() == number);
-        }
-
-        #[test]
-        fn from_isize_and_as_isize_are_inverse((base, number) in (arbitrary_base(), any::<isize>())) {
-            let n = Number::from_isize(&base, number);
-            prop_assert!(n.as_isize() == number);
-        }
-    );
-
-//     proptest!(
-//         #[test]
-//         fn add_arbitrary_digit(digit in 
-//     )
 
     /// Conversion
 
