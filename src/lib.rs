@@ -5,7 +5,7 @@ pub mod iter;
 
 use std::collections::{VecDeque, vec_deque::Iter};
 use std::convert::TryFrom;
-use std::ops::{Shl, Shr, Range};
+use std::ops::{Shl, Shr, Range, Neg};
 use std::iter::Map;
 
 use util::*;
@@ -300,6 +300,13 @@ impl Shr<usize> for Number {
 
     fn shr(mut self, rhs: usize) -> Self::Output {
         self.power -= isize::try_from(rhs).expect("Failed to convert into isize during right shift.");
+        self
+    }
+}
+impl Neg for Number {
+    type Output = Self;
+    fn neg(mut self) -> Self::Output {
+        self.negate();
         self
     }
 }
