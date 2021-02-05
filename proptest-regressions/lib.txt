@@ -1,0 +1,11 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc 2267f2a2b71fbbe2e61dd0548228c4414797412e2dfcdc0c953461abc3ae36b8 # shrinks to ((base, digit, power), number) = ((Base { base: 3, addition_table: [(0, 0), (1, 0), (2, 0), (2, 0), (0, 1), (1, 1)], multiplication_table: [(0, 0), (0, 0), (0, 0), (1, 0), (2, 0), (1, 1)] }, 1, 0), -3)
+cc 6925119bfbdfb6a70bddbc1ea1d95ed9d270d9705fee58e5a97a37f0edbdf300 # shrinks to (base, number) = (Base { base: 19 }, -585526324421635858)
+cc 9f4597913a1eb3cab6f8006e86ae2e210efa819307e82c48f8da48d442ca91bb # shrinks to (base, a, b) = (2, 0, -1)
+cc 7fa5e5992eebe004e27e4bd35f4e0c862fad83a967c9767725bfe41446efa5d1 # shrinks to (base, a, b) = (2, 114994567673955403, -1)
+cc 460c68233205c229a76a2395ec288767c659310f3285707840fd0361244aef25 # shrinks to (base, numbers) = (2, [0, 0, 0])
