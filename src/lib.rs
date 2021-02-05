@@ -135,14 +135,27 @@ impl Number {
         for _ in 0..digits {
             self.push_high(0);
         }
-        // TODO optimize
     }
     fn pad_digits_low(&mut self, digits: usize) {
         for _ in 0..digits {
             self.push_low(0);
-            // TODO optimize
         }
         self.power -= isize::try_from(digits).expect("Overflowed isize while adding low-order digits.");
+    }
+    fn trim_zeroes_high(&mut self) {
+        while self.digits.back() == Some(&0) {
+            self.digits.pop_back();
+        }
+    }
+    fn trim_zeroes_low(&mut self) {
+        while self.digits.front() == Some(&0) {
+            self.digits.pop_front();
+            self.power += 1;
+        }
+    }
+    pub fn simplify(&mut self) {
+        self.trim_zeroes_high();
+        self.trim_zeroes_low();
     }
 
     /// Arithmetic
