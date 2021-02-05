@@ -50,6 +50,13 @@ impl Number {
         }
     }
     pub fn from_isize(base: usize, integer: isize) -> Self {
+        let abs = if integer != isize::MIN {
+            isize::abs(integer) as usize
+        } else {
+            (isize::MAX as usize) + 1
+            // abs() would overflow
+        };
+        let digits = reverse(ConversionFromUsize::new(abs, base).collect::<VecDeque<_>>());
         let sign = if integer >= 0 { Sign::Positive } else { Sign::Negative };
         Self {
             digits,
@@ -254,9 +261,14 @@ impl Number {
             n += self.base.pow(power as u32) * (digit as usize);
         }
         if self.negative() {
-            n = -n
+            if n == (isize::MAX as usize) + 1 {
+                isize::MIN
+            } else {
+                -(n as isize)
+            }
+        } else {
+            n as isize
         }
-        n
     }
 
     pub fn as_usize(&self) -> usize {
