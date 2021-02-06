@@ -274,10 +274,36 @@ impl Number {
         }
     }
 
+    fn mul_digit(&self, mul_digit: Digit, power: isize) -> Self {
+        let mul_digit = mul_digit as usize;
+        let mut output = self.clone();
+        let mut carry = 0;
+        for digit in output.digits.iter_mut() {
+            let product = ((*digit as usize) * mul_digit) + carry;
+            let (new_digit, new_carry) = self.carry(product);
+            carry = new_carry;
+            *digit = new_digit as Digit;
+        }
+        if carry != 0 {
+            output.push_high(carry as Digit);
+        }
+        output <<= power;
+        output
+    }
+
     fn carry(&self, calculation: usize) -> (usize, usize) {
         let carry_digit = calculation / self.base;
         let new_digit = calculation - (carry_digit * self.base);
         (new_digit, carry_digit)
+    }
+
+    fn set_sign_for_mul_div(&mut self, other_sign: Sign) {
+        match (self.sign, other_sign) {
+            (Sign::Positive, Sign::Positive)
+            | (Sign::Negative, Sign::Positive) => {}
+            (Sign::Negative, Sign::Negative) => { self.sign = Sign::Positive; }
+            (Sign::Positive, Sign::Negative) => { self.sign = Sign::Negative; }
+        }
     }
 
     /// Takes the radix complement of the number
@@ -476,6 +502,29 @@ impl Sub<isize> for Number {
     fn sub(self, rhs: isize) -> Self::Output {
         let rhs = Number::from_isize(self.base, rhs);
         self + -rhs
+    }
+}
+
+impl Mul<Number> for Number {
+    type Output = Self;
+
+    fn mul(mut self, rhs: Number) -> Self::Output {
+        self.set_sign_for_mul_div(rhs.sign);
+        self.power += rhs.power;
+        // TODO There's room for optimization to reduce allocations, here
+        // Could truncate & use self instead of a new number, for instance
+        let output = rhs.into_iter()
+            .map(|(digit, power)| self.mul_digit(digit, power))
+            .fold(
+                Number::from_usize(self.base, 0),
+                |mut a, b| {
+                    a.add_digits_from_number(b, true);
+                    a
+                }
+            );
+            // TODO Sum
+        self.digits = output.digits;
+        self
     }
 }
 
@@ -929,6 +978,34 @@ pub mod property_tests {
                 prop_assert!(number_accumulator.as_i128() == native_accumulator);
             }
         }
+
+        #[test]
+        fn arbitrary_integer_multiplication((base, a, b) in (arbitrary_base(), any::<isize>(), any::<isize>())) {
+            prop_assume!(a == 0 || i128::MAX / i128::abs(a as i128) > b as i128);
+            let expected = (a as i128) * (b as i128);
+            let a = Number::from_isize(base, a);
+            let b = Number::from_isize(base, b);
+            let observed = a * b;
+            prop_assert!(observed.as_i128() == expected);
+        }
+
+        #[test]
+        fn product_of_many_integers((base, numbers) in (arbitrary_base(), proptest::collection::vec(any::<i8>(), 3..10))) {
+            // TODO make a strategy for testing larger integers - currently using i8s to avoid
+            // overflow
+            let mut native_accumulator = 1i128;
+            for number in numbers.iter() {
+                let x = native_accumulator.checked_mul(*number as i128);
+                prop_assume!(!x.is_none()); // Don't overflow
+                native_accumulator = x.unwrap();
+            }
+
+            let mut native_accumulator = 1i128;
+            let mut number_accumulator = Number::from_usize(base, 1);
+            for number in numbers {
+                number_accumulator = number_accumulator * Number::from_isize(base, number as isize);
+                native_accumulator *= number as i128;
+                prop_assert!(number_accumulator.as_i128() == native_accumulator);
             }
         }
 
