@@ -905,8 +905,31 @@ pub mod property_tests {
             for number in numbers {
                 native_accumulator += number as i128;
                 number_accumulator = number_accumulator + Number::from_isize(base, number);
+                prop_assert!(number_accumulator.as_i128() == native_accumulator);
             }
-            prop_assert!(number_accumulator.as_i128() == native_accumulator);
+        }
+
+    
+        #[test]
+        fn arbitrary_integer_subtraction((base, a, b) in (arbitrary_base(), any::<isize>(), any::<isize>())) {
+            let expected = (a as i128) - (b as i128);
+            let mut a = Number::from_isize(base, a);
+            let b = Number::from_isize(base, b);
+            a = a - b;
+            prop_assert!(a.as_i128() == expected);
+        }
+
+        #[test]
+        fn difference_of_many_integers((base, numbers) in (arbitrary_base(), proptest::collection::vec(any::<isize>(), 3..10))) {
+            let mut native_accumulator = 0i128;
+            let mut number_accumulator = Number::from_usize(base, 0);
+            for number in numbers {
+                native_accumulator -= number as i128;
+                number_accumulator = number_accumulator - Number::from_isize(base, number);
+                prop_assert!(number_accumulator.as_i128() == native_accumulator);
+            }
+        }
+            }
         }
 
     );
