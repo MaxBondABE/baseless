@@ -1,4 +1,5 @@
 #![allow(dead_code)]
+#![feature(deque_range)]
 
 pub mod util;
 pub mod iter;
@@ -87,8 +88,20 @@ impl Number {
         self.sign == Sign::Negative
     }
     pub fn is_integer(&self) -> bool {
-        self.digits.len() == 0 || self.power >= 0
-        // TODO check if fractional part is 0
+        self.digits.len() == 0 || self.power >= 0 ||
+            self.fraction_digits().unwrap().all(|d| *d == 0)
+    }
+
+    // FP API
+
+    pub fn fraction_digits(&self) -> Option<VecIter<Digit>> {
+        if self.power >= 0 {
+            None
+        } else {
+            let start = 0;
+            let end = isize::abs(self.power) as usize;
+            Some(self.digits.range(start..end))
+        }
     }
     pub fn floor(&mut self) {
         todo!()
@@ -301,7 +314,7 @@ impl Number {
             panic!("Unable to convert to isize: number is not an integer");
         }
         let mut n = 0;
-        for (digit, power) in self.digit_and_power_iter() {
+        for (digit, power) in self.digit_and_power_iter().filter(|(_, power)| *power >= 0) {
             n += self.base.pow(power as u32) * (digit as usize);
         }
         if self.negative() {
@@ -323,7 +336,7 @@ impl Number {
             panic!("Unable to convert to usize: number is negative");
         }
         let mut n = 0;
-        for (digit, power) in self.digit_and_power_iter() {
+        for (digit, power) in self.digit_and_power_iter().filter(|(_, power)| *power >= 0) {
             n += self.base.pow(power as u32) * (digit as usize);
         }
         n
@@ -338,7 +351,7 @@ impl Number {
         }
         let mut n = 0;
         let base = self.base as u128;
-        for (digit, power) in self.digit_and_power_iter() {
+        for (digit, power) in self.digit_and_power_iter().filter(|(_, power)| *power >= 0) {
             n += base.pow(power as u32) * (digit as u128);
         }
         n
@@ -350,7 +363,7 @@ impl Number {
         }
         let mut n = 0;
         let base = self.base as u128;
-        for (digit, power) in self.digit_and_power_iter() {
+        for (digit, power) in self.digit_and_power_iter().filter(|(_, power)| *power >= 0) {
             n += base.pow(power as u32) * (digit as u128);
         }
         if self.negative() {
