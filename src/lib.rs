@@ -5,7 +5,7 @@ pub mod iter;
 
 use std::collections::{VecDeque, vec_deque::Iter as VecIter, vec_deque::IntoIter as VecIntoIter};
 use std::convert::TryFrom;
-use std::ops::{Shl, Shr, Range, Neg, Add, Sub};
+use std::ops::{Shl, Shr, Range, Neg, Add, Sub, Mul, ShlAssign};
 use std::iter::{Map, Zip};
 use std::cmp::Ordering;
 
@@ -473,6 +473,30 @@ impl Shr<usize> for Number {
     fn shr(mut self, rhs: usize) -> Self::Output {
         self.power -= isize::try_from(rhs).expect("Failed to convert into isize during right shift.");
         self
+    }
+}
+
+impl Shl<isize> for Number {
+    type Output = Self;
+
+    fn shl(mut self, rhs: isize) -> Self::Output {
+        self.power += rhs;
+        self
+    }
+}
+
+impl Shr<isize> for Number {
+    type Output = Self;
+
+    fn shr(mut self, rhs: isize) -> Self::Output {
+        self.power -= rhs;
+        self
+    }
+}
+
+impl ShlAssign<isize> for Number {
+    fn shl_assign(&mut self, rhs: isize) {        
+        self.power += rhs;
     }
 }
 
