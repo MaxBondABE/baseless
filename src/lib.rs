@@ -585,23 +585,6 @@ enum PowerIndexError {
 pub mod test {
     use super::*;
 
-//     #[test]
-//     fn testcase() {
-// 
-// 
-//         let mut n = Number::from_isize(10, 10);
-//         n = n + -11isize;
-//         assert_eq!(n.as_isize(), -1);
-// 
-//         let mut n = Number::from_isize(10, -10);
-//         n = n + 11isize;
-//         assert_eq!(n.as_isize(), 1);
-// 
-//         let mut n = Number::from_isize(10, -100);
-//         n = n + 1isize;
-//         assert_eq!(n.as_isize(), -99);
-//     }
-
     /// Number Vector API
 
     #[test]
@@ -751,6 +734,10 @@ pub mod test {
         let mut n = Number::new(10);
         n = n << 1isize;
         assert_eq!(n.power(), 1);
+
+        let mut n = Number::new(10);
+        n <<= 1isize;
+        assert_eq!(n.power(), 1);
     }
 
     #[test]
@@ -791,12 +778,17 @@ pub mod test {
 
     #[test]
     fn complement_with_many_zeros() {
-
         let mut n = Number::from_isize(10, 1200003);
         n.complement();
         assert_eq!(n.as_usize(), 8799997);
     }
 
+    #[test]
+    fn complement_with_low_order_zeroes() {
+        let mut n = Number::from_isize(10, 101000);
+        n.complement();
+        assert_eq!(n.as_usize(), 899000);
+    }
 
     #[test]
     fn add_positive_single_digit_number_to_many_digit_positive_number() {
@@ -807,7 +799,6 @@ pub mod test {
 
     #[test]
     fn add_negative_single_digit_number_to_many_digit_positive_number() {
-
         let mut n = Number::from_usize(10, 100);
         n = n + -1isize;
         assert_eq!(n.as_usize(), 99);
@@ -839,6 +830,58 @@ pub mod test {
         let mut n = Number::from_isize(10, 9);
         n = n + -10isize;
         assert_eq!(n.as_isize(), -1)
+    }
+
+    #[test]
+    fn multiply_single_digits() {
+        let n = Number::from_usize(10, 5);
+        let m = Number::from_usize(10, 3);
+        let x = m * n;
+        assert_eq!(x.as_isize(), 15);
+    }
+
+    #[test]
+    fn multiply_many_digits_with_simple_values() {
+        let n = Number::from_usize(10, 100);
+        let m = Number::from_usize(10, 100);
+        let x = m * n;
+        assert_eq!(x.as_isize(), 10000);
+    }
+
+    #[test]
+    fn multiply_many_digits_with_complicated_values() {
+        // "Complicated" used here because this example has more complexity,
+        // but I didn't want to cannote sqrt(-1)
+        let n = Number::from_usize(10, 123);
+        let m = Number::from_usize(10, 456);
+        let x = m * n;
+        assert_eq!(x.as_isize(), 56088);
+    }
+
+    #[test]
+    fn multiply_by_zero() {
+        let n = Number::from_usize(10, 100);
+        let m = Number::from_usize(10, 0);
+        let x = m * n;
+        assert_eq!(x.as_isize(), 0);
+    }
+
+    #[test]
+    fn multiply_positive_by_negative_one() {
+        let base = 10;
+        let a = Number::from_isize(base, 100);
+        let b = Number::from_isize(base, -1);
+        let x = a * b;
+        assert_eq!(x.as_isize(), -100); 
+    }
+
+    #[test]
+    fn multply_negative_by_negative_one() {
+        let base = 10;
+        let a = Number::from_isize(base, -100);
+        let b = Number::from_isize(base, -1);
+        let x = a * b;
+        assert_eq!(x.as_isize(), 100); 
     }
 
     /// Conversion
