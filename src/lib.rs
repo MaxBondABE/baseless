@@ -236,6 +236,12 @@ impl Number {
         }
     }
 
+    fn add_digits_from_number(&mut self, other: Self, propogate_carry: bool) {
+        for (digit, power) in other {
+            self.add_digit(digit, power, propogate_carry);
+        }
+    }
+
     fn match_digits_and_powers(&mut self, other: &mut Self) {
         // Match powers & number of digits - complement only works w/
         // same number of digits, same number of digits only meaningful
@@ -408,9 +414,7 @@ impl Add<Number> for Number {
 
     fn add(mut self, mut rhs: Number) -> Self::Output {
         if self.sign == rhs.sign {
-            for (digit, power) in rhs {
-                self.add_digit(digit, power, true);
-            }
+            self.add_digits_from_number(rhs, true);
         } else {
             self.match_digits_and_powers(&mut rhs);
             let overflow;
@@ -423,9 +427,7 @@ impl Add<Number> for Number {
                 Ordering::Less => { overflow = true; }
             }
             if self.negative() { self.complement() } else { rhs.complement() }
-            for (digit, power) in rhs {
-                self.add_digit(digit, power, false);
-            }
+            self.add_digits_from_number(rhs, false);
             if overflow {
                 self.negate();
             }
