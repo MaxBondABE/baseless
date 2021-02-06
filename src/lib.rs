@@ -224,8 +224,8 @@ impl Number {
         let mut carry = digit as usize;
         for idx in self.get_power(power)..self.digits.len() {
             let sum = (self.digits[idx] as usize) + carry;
-            carry = sum / self.base;
-            let new_digit = sum - (carry * self.base);
+            let (new_digit, new_carry) = self.carry(sum);
+            carry = new_carry;
             self.digits[idx] = new_digit as Digit;
             if carry == 0 {
                 break;
@@ -266,6 +266,12 @@ impl Number {
         } else {
             Ordering::Less
         }
+    }
+
+    fn carry(&self, calculation: usize) -> (usize, usize) {
+        let carry_digit = calculation / self.base;
+        let new_digit = calculation - (carry_digit * self.base);
+        (new_digit, carry_digit)
     }
 
     /// Takes the radix complement of the number
