@@ -700,14 +700,14 @@ pub mod test {
     #[test]
     fn shift_left_increases_power() {
         let mut n = Number::new(10);
-        n = n << 1;
+        n = n << 1isize;
         assert_eq!(n.power(), 1);
     }
 
     #[test]
     fn shift_right_decreases_power() {
         let mut n = Number::new(10);
-        n = n >> 1;
+        n = n >> 1isize;
         assert_eq!(n.power(), -1);
     }
 
