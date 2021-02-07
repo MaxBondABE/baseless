@@ -6,7 +6,11 @@ pub mod iter;
 
 use std::collections::{VecDeque, vec_deque::Iter as VecIter, vec_deque::IntoIter as VecIntoIter};
 use std::convert::TryFrom;
-use std::ops::{Shl, Shr, Range, Neg, Add, Sub, Mul, ShlAssign};
+use std::ops::{
+    Range,
+    Neg, Shl, Shr, Add, Sub, Mul,
+    ShlAssign, ShrAssign, AddAssign, SubAssign, MulAssign
+};
 use std::iter::{Map, Zip};
 use std::cmp::Ordering;
 
@@ -427,18 +431,23 @@ impl IntoIterator for Number {
     }
 }
 
-impl Neg for Number {
+impl Neg for &mut Number {
     type Output = Self;
-    fn neg(mut self) -> Self::Output {
+    fn neg(self) -> Self::Output {
         self.negate();
         self
     }
 }
-
-impl Add<Number> for Number {
+impl Neg for Number {
     type Output = Self;
+    fn neg(mut self) -> Self::Output {
+        let _ = (&mut self).neg();
+        self
+    }
+}
 
-    fn add(mut self, mut rhs: Number) -> Self::Output {
+impl AddAssign<Number> for &mut Number {
+    fn add_assign(&mut self, mut rhs: Number) {
         if self.sign == rhs.sign {
             self.add_digits_from_number(rhs, true);
         } else {
@@ -447,7 +456,7 @@ impl Add<Number> for Number {
             match self.compare_abs(&mut rhs) {
                 Ordering::Equal => {
                     self.digits.truncate(0);
-                    return self;
+                    return;
                 }
                 Ordering::Greater => { overflow = false; }
                 Ordering::Less => { overflow = true; }
@@ -461,6 +470,20 @@ impl Add<Number> for Number {
                 self.complement()
             }
         }
+    }
+}
+impl AddAssign<Number> for Number {
+    fn add_assign(&mut self, rhs: Number) {
+        // Pass the buck to the &mut Number implementation
+        let mut x = self;
+        x += rhs;
+    }
+}
+impl Add<Number> for Number {
+    type Output = Self;
+
+    fn add(mut self, rhs: Number) -> Self::Output {
+        self += rhs;
         self
     }
 }
@@ -481,6 +504,17 @@ impl Add<isize> for Number {
     }
 }
 
+impl SubAssign<Number> for &mut Number {
+    fn sub_assign(&mut self, rhs: Number) {
+        *self += -rhs;
+    }
+}
+impl SubAssign<Number> for Number {
+    fn sub_assign(&mut self, rhs: Number) {
+        let mut x = self;
+        x -= rhs;
+    }
+}
 impl Sub<Number> for Number {
     type Output = Self;
 
@@ -505,10 +539,8 @@ impl Sub<isize> for Number {
     }
 }
 
-impl Mul<Number> for Number {
-    type Output = Self;
-
-    fn mul(mut self, rhs: Number) -> Self::Output {
+impl MulAssign<Number> for &mut Number {
+    fn mul_assign(&mut self, rhs: Number) {
         self.set_sign_for_mul_div(rhs.sign);
         self.power += rhs.power;
         // TODO There's room for optimization to reduce allocations, here
@@ -524,37 +556,79 @@ impl Mul<Number> for Number {
             );
             // TODO Sum
         self.digits = output.digits;
-        self
     }
 }
-
-impl Shl<usize> for Number {
+impl Mul<Number> for &mut Number {
     type Output = Self;
 
-    fn shl(mut self, rhs: usize) -> Self::Output {
-        self.power += isize::try_from(rhs).expect("Failed to convert into isize during left shift.");
+    fn mul(mut self, rhs: Number) -> Self::Output {
+        self *= rhs;
         self
     }
 }
+impl MulAssign<Number> for Number {
+    fn mul_assign(&mut self, rhs: Number) {
+        let mut x = self;
+        x *= rhs;
+    }
+}
+impl Mul<Number> for Number {
+    type Output = Self;
 
+    fn mul(mut self, rhs: Number) -> Self::Output {
+        self *= rhs;
+        self
+    }
+}
+impl MulAssign<usize> for Number {
+    fn mul_assign(&mut self, rhs: usize) {
+        let rhs = Number::from_usize(self.base, rhs);
+        let mut x = self;
+        x *= rhs;
+    }
+}
+impl MulAssign<isize> for Number {
+    fn mul_assign(&mut self, rhs: isize) {
+        let rhs = Number::from_isize(self.base, rhs);
+        let mut x = self;
+        x *= rhs;
+    }
+}
+impl Mul<usize> for Number {
+    type Output = Self;
+
+    fn mul(self, rhs: usize) -> Self::Output {
+        let rhs = Number::from_usize(self.base, rhs);
+        self * rhs
+    }
+}
+impl Mul<isize> for Number {
+    type Output = Self;
+
+    fn mul(self, rhs: isize) -> Self::Output {
+        let rhs = Number::from_isize(self.base, rhs);
+        self * rhs
+    }
+}
+
+impl ShrAssign<usize> for Number {
+    fn shr_assign(&mut self, rhs: usize) {
+        self.power -= isize::try_from(rhs).expect("Failed to convert usize into isize during right shift.");
+    }
+}
+impl ShrAssign<isize> for Number {
+    fn shr_assign(&mut self, rhs: isize) {
+        self.power -= rhs
+    }
+}
 impl Shr<usize> for Number {
     type Output = Self;
 
     fn shr(mut self, rhs: usize) -> Self::Output {
-        self.power -= isize::try_from(rhs).expect("Failed to convert into isize during right shift.");
+        self.power -= isize::try_from(rhs).expect("Failed to convert usize into isize during right shift.");
         self
     }
 }
-
-impl Shl<isize> for Number {
-    type Output = Self;
-
-    fn shl(mut self, rhs: isize) -> Self::Output {
-        self.power += rhs;
-        self
-    }
-}
-
 impl Shr<isize> for Number {
     type Output = Self;
 
@@ -564,9 +638,30 @@ impl Shr<isize> for Number {
     }
 }
 
+impl ShlAssign<usize> for Number {
+    fn shl_assign(&mut self, rhs: usize) {
+        self.power -= isize::try_from(rhs).expect("Failed to convert usize into isize during left shift.");
+    }
+}
 impl ShlAssign<isize> for Number {
     fn shl_assign(&mut self, rhs: isize) {        
         self.power += rhs;
+    }
+}
+impl Shl<usize> for Number {
+    type Output = Self;
+
+    fn shl(mut self, rhs: usize) -> Self::Output {
+        self.power += isize::try_from(rhs).expect("Failed to convert usize into isize during left shift.");
+        self
+    }
+}
+impl Shl<isize> for Number {
+    type Output = Self;
+
+    fn shl(mut self, rhs: isize) -> Self::Output {
+        self.power += rhs;
+        self
     }
 }
 
